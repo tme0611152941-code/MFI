@@ -19,27 +19,42 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 🐔 ไฟล์เสียงไก่ขันแบบ Base64 (เล่นได้ชัวร์ 100% ไม่ต้องใช้อินเทอร์เน็ต)
-ROOSTER_SOUND_BASE64 = "data:audio/wav;base64,UklGRmAGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YUAGAACBhYqKm52mqa6xs7m7vr/Aw8TGxsfIyMnJysrKy8vLy8vLy8vLy8vLy8vL/v7+/P3+/v39/f39/f39/v7+/v7+/v7+/v7+/f39/v7+/v7+/f39/v7+/v7+/v7+/v7+/v7+/v7+/v7+"
-
-# ฟังก์ชันสั่งให้ AI พูดภาษาไทยพร้อมปรับแต่งเสียง
-def speak_thai(text):
-    js_code = f"""
-    <script>
-        setTimeout(function() {{
-            window.speechSynthesis.cancel(); // ล้างคิวเสียงเก่า
-            var msg = new SpeechSynthesisUtterance('{text}');
-            msg.lang = 'th-TH';
-            msg.rate = 0.85; // ปรับความเร็วเสียงพูดให้ช้าลงนิดนึง ฟังง่าย
-            msg.pitch = 1.0;
-            window.speechSynthesis.speak(msg);
-        }}, 100);
-    </script>
-    """
-    st.components.v1.html(js_code, height=0)
+# ฟังก์ชันสั่งเล่นเสียงเอฟเฟกต์/พูดภาษาไทย พร้อมหน่วงเวลา (รันผ่าน JS ปลอดภัยต่อ Safari)
+def play_audio_script(script_type):
+    if script_type == "night_done":
+        # หน่วงเวลา 2 วินาที แล้วพูดภาษาไทย
+        js = """
+        <script>
+            setTimeout(function() {
+                window.speechSynthesis.cancel();
+                var msg = new SpeechSynthesisUtterance('ทำภารกิจเสร็จแล้ว ส่งเครื่องคืนกลางวง แล้วหลับตาลงได้ค่ะ');
+                msg.lang = 'th-TH';
+                msg.rate = 0.85;
+                window.speechSynthesis.speak(msg);
+            }, 2000);
+        </script>
+        """
+    elif script_type == "morning_rooster":
+        # เล่นเสียงไก่ขัน MP3 ชัดเจน + AI พูดปลุกยามเช้า
+        js = """
+        <script>
+            var audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            audio.play();
+            setTimeout(function() {
+                window.speechSynthesis.cancel();
+                var msg = new SpeechSynthesisUtterance('อรุณสวัสดิ์ค่ะทุกคน ลืมตาขึ้นมาได้แล้วค่ะ');
+                msg.lang = 'th-TH';
+                msg.rate = 0.85;
+                window.speechSynthesis.speak(msg);
+            }, 2500);
+        </script>
+        """
+    else:
+        js = ""
+    st.components.v1.html(js, height=0)
 
 st.title("🤖 AI Werewolf Master")
-st.caption("ระบบคุมเกมอัตโนมัติ (เสียงคนพูด + หน่วง 2 วินาที + เสียงไก่ขันตอนเช้า) 🔊")
+st.caption("ระบบคุมเกมอัตโนมัติ (แก้ไขระบบเสียงและไก่ขันเรียบร้อย) 🔊")
 
 st.divider()
 
@@ -56,8 +71,8 @@ if 'day_count' not in st.session_state:
     st.session_state.day_count = 1
 if 'night_step' not in st.session_state:
     st.session_state.night_step = 0
-if 'trigger_speech' not in st.session_state:
-    st.session_state.trigger_speech = False
+if 'audio_trigger' not in st.session_state:
+    st.session_state.audio_trigger = None
 
 # ==========================================
 # PHASE 1: SETUP
@@ -144,7 +159,7 @@ elif st.session_state.game_phase == 'VIEW_ROLES':
 elif st.session_state.game_phase == 'NIGHT_LOOP':
     st.subheader(f"🌙 ช่วงกลางคืน (คืนที่ {st.session_state.day_count})")
     st.error("🙈 **ทุกคนในวงหลับตาแน่นๆ!**")
-    
+
     # Step 1: หมาป่า
     if st.session_state.night_step == 1:
         st.markdown("<div class='night-card'>", unsafe_allow_html=True)
@@ -155,22 +170,16 @@ elif st.session_state.game_phase == 'NIGHT_LOOP':
         if st.button("🔔 ยืนยันเป้าหมายสังหาร", type="primary"):
             if target_k != "-- เลือกเป้าหมาย --":
                 st.session_state.night_kills = target_k
-                st.session_state.trigger_speech = True
-            else:
-                st.error("กรุณาเลือกเป้าหมายก่อนครับ!")
-
-        if st.session_state.trigger_speech:
-            with st.spinner("⏳ กำลังบันทึกข้อมูล... กรุณารอสักครู่"):
-                time.sleep(2) # เว้นจังหวะ 2 วินาทีตามขอ
-            
-            speak_thai("ทำภารกิจเสร็จแล้ว ส่งเครื่องคืนกลางวง แล้วหลับตาลงได้ค่ะ")
-            st.success("🗣️ ส่งเสียงเตือนแล้ว! วางเครื่องไว้กลางวงได้เลย")
-            
-            if st.button("➡️ เข้าสู่บทบาทถัดไป (หมอ)"):
-                st.session_state.trigger_speech = False
+                st.session_state.audio_trigger = "night_done"
                 st.session_state.night_step = 2
                 st.rerun()
-
+            else:
+                st.error("กรุณาเลือกเป้าหมายก่อนครับ!")
+                
+        if st.session_state.audio_trigger == "night_done":
+            play_audio_script("night_done")
+            st.session_state.audio_trigger = None
+            
         st.markdown("</div>", unsafe_allow_html=True)
 
     # Step 2: หมอ
@@ -184,19 +193,13 @@ elif st.session_state.game_phase == 'NIGHT_LOOP':
             
             if st.button("🔔 ยืนยันการปกป้อง", type="primary"):
                 st.session_state.night_heals = target_h
-                st.session_state.trigger_speech = True
-
-            if st.session_state.trigger_speech:
-                with st.spinner("⏳ กำลังบันทึกข้อมูล... กรุณารอสักครู่"):
-                    time.sleep(2) # เว้นจังหวะ 2 วินาที
+                st.session_state.audio_trigger = "night_done"
+                st.session_state.night_step = 3
+                st.rerun()
                 
-                speak_thai("ทำภารกิจเสร็จแล้ว ส่งเครื่องคืนกลางวง แล้วหลับตาลงได้ค่ะ")
-                st.success("🗣️ ส่งเสียงเตือนแล้ว! วางเครื่องไว้กลางวงได้เลย")
-                
-                if st.button("➡️ เข้าสู่บทบาทถัดไป (ผู้หยั่งรู้)"):
-                    st.session_state.trigger_speech = False
-                    st.session_state.night_step = 3
-                    st.rerun()
+            if st.session_state.audio_trigger == "night_done":
+                play_audio_script("night_done")
+                st.session_state.audio_trigger = None
 
             st.markdown("</div>", unsafe_allow_html=True)
         else:
@@ -220,19 +223,13 @@ elif st.session_state.game_phase == 'NIGHT_LOOP':
                     st.success(f"🔮 คำตอบลับ: **{seer_t} คือ ฝ่ายดี/ชาวบ้าน 🟢**")
             
             if st.button("🔔 อ่านเสร็จแล้ว ยืนยัน", type="primary"):
-                st.session_state.trigger_speech = True
-
-            if st.session_state.trigger_speech:
-                with st.spinner("⏳ กำลังบันทึกข้อมูล... กรุณารอสักครู่"):
-                    time.sleep(2) # เว้นจังหวะ 2 วินาที
+                st.session_state.audio_trigger = "night_done"
+                st.session_state.night_step = 4
+                st.rerun()
                 
-                speak_thai("ทำภารกิจเสร็จแล้ว ส่งเครื่องคืนกลางวง แล้วหลับตาลงได้ค่ะ")
-                st.success("🗣️ ส่งเสียงเตือนแล้ว! วางเครื่องไว้กลางวงได้เลย")
-                
-                if st.button("➡️ กิจกรรมกลางคืนเสร็จสิ้น -> ปลุกทุกคน"):
-                    st.session_state.trigger_speech = False
-                    st.session_state.night_step = 4
-                    st.rerun()
+            if st.session_state.audio_trigger == "night_done":
+                play_audio_script("night_done")
+                st.session_state.audio_trigger = None
 
             st.markdown("</div>", unsafe_allow_html=True)
         else:
@@ -243,11 +240,10 @@ elif st.session_state.game_phase == 'NIGHT_LOOP':
     elif st.session_state.night_step == 4:
         st.success("✅ กิจกรรมกลางคืนเสร็จสิ้นทั้งหมดแล้ว!")
         
-        st.markdown("### 🐓 สัญญาณเช้าวันใหม่ (ไก่ขัน):")
-        st.audio(ROOSTER_SOUND_BASE64, autoplay=True)
+        # เล่นเสียงไก่ขัน MP3 และ AI พูดปลุกอัตโนมัติ
+        play_audio_script("morning_rooster")
         
-        # AI พูดแจ้งให้ทุกคนลืมตา
-        speak_thai("อรุณสวัสดิ์ค่ะทุกคน คืนนี้ผ่านพ้นไปแล้ว ลืมตาขึ้นมาได้เลยค่ะ")
+        st.warning("🔊 **กำลังส่งเสียงไก่ขันและเสียงปลุก... ให้ทุกคนลืมตาขึ้นได้เลย!**")
         
         if st.button("☀️ เข้าสู่ช่วงสรุปผลรุ่งเช้า (ทุกคนลืมตา!)", type="primary", use_container_width=True):
             killed = st.session_state.night_kills
