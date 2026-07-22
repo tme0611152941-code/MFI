@@ -1,138 +1,198 @@
 import streamlit as st
-import time
-import pandas as pd
-import numpy as np
+import streamlit.components.v1 as components
 
-# 1. ตั้งค่าคอนฟิกหน้าจอ
+# 1. ตั้งค่าหน้าจอ
 st.set_page_config(
-    page_title="GÖTTFERT miConnect - Melt Index Software",
-    page_icon="🎛️",
+    page_title="eFootball 3D Penalty - Streamlit Edition",
+    page_icon="⚽",
     layout="wide"
 )
 
-# Custom CSS (แก้คำว่า unsafe_allow_html ให้ถูกต้องแล้ว)
-st.markdown("""
+st.title("⚽ eFootball 3D: Ultimate Penalty Kick")
+st.caption("เกมยิงจุดโทษ 3D รันสดบนเบราว์เซอร์ผ่าน Three.js Physics Engine 🎮")
+
+# 2. ฝัง HTML/JavaScript (Three.js 3D Engine)
+html_code = """
+<!DOCTYPE html>
+<html>
+<head>
     <style>
-    .main { background-color: #1e1e1e; }
-    .stMetric { background-color: #2b2b2b; padding: 10px; border-radius: 5px; border-left: 4px solid #ff6b00; }
-    .status-box { background-color: #0d3b1e; color: #00ff66; padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; }
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; font-family: sans-serif; }
+        #canvas-container { width: 100vw; height: 75vh; }
+        #ui-panel {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 12px;
+            color: white; text-align: center; border: 2px solid #00ff66;
+            box-shadow: 0 0 15px rgba(0,255,102,0.4);
+        }
+        button {
+            background: #00ff66; color: black; border: none; padding: 10px 20px;
+            font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin: 5px;
+        }
+        button:hover { background: #00cc52; }
+        .slider-group { display: inline-block; margin: 0 10px; }
     </style>
-""", unsafe_allow_html=True)
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
 
-# Header ซอฟต์แวร์จริง
-st.title("🎛️ GÖTTFERT miConnect v4.2")
-st.caption("Testing System for Melt Flow Rate (MFR) & Melt Volume Rate (MVR) - mi40 Series")
+    <div id="canvas-container"></div>
 
-st.divider()
+    <div id="ui-panel">
+        <div class="slider-group">
+            <label>มุมยิง (Aim): </label>
+            <input type="range" id="aimAngle" min="-0.3" max="0.3" step="0.01" value="0">
+        </div>
+        <div class="slider-group">
+            <label>แรงยิง (Power): </label>
+            <input type="range" id="shootPower" min="15" max="35" step="1" value="22">
+        </div>
+        <button onclick="shootBall()">⚽ SHOOT!</button>
+        <button onclick="resetBall()" style="background:#ff9900;">🔄 RESET</button>
+        <h3 id="result-text" style="margin: 8px 0 0 0; color: #00ff66;">เล็งมุมแล้วกด SHOOT เพื่อยิงประตู!</h3>
+    </div>
 
-# 2. เลย์เอาต์แบ่ง 2 คอลัมน์ (ฝั่งตั้งค่า / ฝั่งหน้าจอควบคุม)
-col_setup, col_display = st.columns([1, 2])
+<script>
+    // --- 3D SCENE SETUP ---
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a2b3c);
+    scene.fog = new THREE.FogExp2(0x1a2b3c, 0.015);
 
-# --- ฝั่งซ้าย: TEST PARAMETERS & METHOD SETUP ---
-with col_setup:
-    st.subheader("🛠️ Test Parameters")
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / (window.innerHeight * 0.75), 0.1, 1000);
+    camera.position.set(0, 2.2, 10);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight * 0.75);
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    // --- LIGHTS ---
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(10, 20, 10);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    // --- PITCH (สนามหญ้า) ---
+    const pitchGeo = new THREE.PlaneGeometry(60, 80);
+    const pitchMat = new THREE.MeshStandardMaterial({ color: 0x1e88e5, roughness: 0.8 }); // Green Pitch
+    const pitch = new THREE.Mesh(pitchGeo, pitchMat);
+    pitch.material.color.setHex(0x2e7d32);
+    pitch.rotation.x = -Math.PI / 2;
+    pitch.receiveShadow = true;
+    scene.add(pitch);
+
+    // --- GOAL POST (โกลฟุตบอล 3D) ---
+    const goalGroup = new THREE.Group();
+    const postMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
     
-    sample_id = st.text_input("Sample Name / Batch ID", "HDPE-LOT-2026-01")
-    operator = st.text_input("Operator Name", "Tam (SUT)")
-    standard = st.selectbox("Standard Method", ["ISO 1133-1", "ASTM D1238"])
-    
-    st.markdown("---")
-    st.markdown("**Material Profile & Conditions**")
-    material = st.selectbox("Polymer Selection", ["HDPE", "PP", "LDPE", "PET", "Custom"])
-    
-    # Preset ค่าตามชนิดพลาสติก
-    if material == "HDPE":
-        def_temp, def_load, def_density = 190.0, 2.16, 0.766
-    elif material == "PP":
-        def_temp, def_load, def_density = 230.0, 2.16, 0.738
-    elif material == "LDPE":
-        def_temp, def_load, def_density = 190.0, 2.16, 0.762
-    else:
-        def_temp, def_load, def_density = 190.0, 2.16, 0.766
+    // เสาซ้าย-ขวา & คาน
+    const leftPost = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3), postMat);
+    leftPost.position.set(-3.6, 1.5, -15);
+    const rightPost = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3), postMat);
+    rightPost.position.set(3.6, 1.5, -15);
+    const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 7.4), postMat);
+    crossbar.rotation.z = Math.PI / 2;
+    crossbar.position.set(0, 3, -15);
 
-    set_temp = st.number_input("Set Temperature (°C)", value=def_temp, step=0.1)
-    test_load = st.number_input("Test Load (kg)", value=def_load, step=0.01)
-    melt_density = st.number_input("Melt Density (g/cm³)", value=def_density, format="%.3f")
-    preheat_time = st.slider("Pre-heat Time (sec)", 60, 300, 240)
+    goalGroup.add(leftPost, rightPost, crossbar);
+    scene.add(goalGroup);
 
-# --- ฝั่งขวา: REAL-TIME MONITORING & GRAPH ---
-with col_display:
-    st.subheader("🖥️ Machine Control & Live Monitor")
-    
-    # แสดงไฟสถานะและ Metric 3 ช่อง
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Barrel Temp", f"{set_temp:.1f} °C", "STABLE (±0.1)")
-    m2.metric("Selected Load", f"{test_load} kg", "Motorized OK")
-    m3.metric("Piston Sensor", "READY", "Zone 0 mm")
-    
-    st.markdown("<div class='status-box'>SYSTEM STATUS: THERMAL EQUILIBRIUM REACHED</div>", unsafe_allow_html=True)
-    st.write("")
+    // --- GOALKEEPER 3D (โกล AI) ---
+    const gkGeo = new THREE.BoxGeometry(0.8, 2.2, 0.5);
+    const gkMat = new THREE.MeshStandardMaterial({ color: 0xffcc00 }); // เสื้อโกลสีเหลือง
+    const goalkeeper = new THREE.Mesh(gkGeo, gkMat);
+    goalkeeper.position.set(0, 1.1, -14.8);
+    goalkeeper.castShadow = true;
+    scene.add(goalkeeper);
 
-    # แท็บจำลองหน้าจอทำงาน
-    tab_graph, tab_data, tab_manual = st.tabs(["📈 Live Measuring Curve", "📊 Result Data Table", "📋 Operating Checklist"])
-    
-    with tab_manual:
-        st.write("**Checkpoints Before Test Run:**")
-        c1 = st.checkbox("Die inserted at Barrel bottom")
-        c2 = st.checkbox("Sample resin (3-5g) loaded & tamped")
-        c3 = st.checkbox("Piston positioned in Barrel")
-        c4 = st.checkbox("Heat shield & Safety cover closed")
+    // --- FOOTBALL 3D (ลูกบอล) ---
+    const ballGeo = new THREE.SphereGeometry(0.35, 32, 32);
+    const ballMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+    const ball = new THREE.Mesh(ballGeo, ballMat);
+    ball.position.set(0, 0.35, 6);
+    ball.castShadow = true;
+    scene.add(ball);
 
-    with tab_graph:
-        st.write("**Piston Position Trajectory (Start Range -> End Range)**")
+    // --- PHYSICS & ANIMATION ---
+    let ballVelocity = new THREE.Vector3();
+    let isMoving = false;
+    let gkVelocityX = 0;
+
+    function shootBall() {
+        if (isMoving) return;
         
-        # ปุ่มสั่ง START TEST
-        if st.button("🔴 START MEASUREMENT", type="primary", use_container_width=True):
-            if not (c1 and c2 and c3):
-                st.error("❌ Please complete all Operating Checklists before starting!")
-            else:
-                # จำลองการ Pre-heat
-                with st.spinner(f"Pre-heating melt for {preheat_time}s..."):
-                    p_bar = st.progress(0)
-                    for i in range(100):
-                        time.sleep(0.02)
-                        p_bar.progress(i + 1)
-                
-                st.success("✅ Pre-heat Complete! Weight released automatically.")
-                
-                # จำลองสร้างข้อมูลกราฟ Real-time
-                time_steps = np.linspace(0, 30, 30)
-                distance_data = np.cumsum(np.random.normal(0.85, 0.05, 30))
-                
-                chart_df = pd.DataFrame({
-                    "Time (s)": time_steps,
-                    "Piston Travel (mm)": distance_data,
-                    "Lower Mark (Start)": 6.35,
-                    "Upper Mark (End)": 25.4
-                }).set_index("Time (s)")
-                
-                # วาดกราฟ
-                st.line_chart(chart_df)
-                
-                # คำนวณผลลัพธ์
-                sim_mvr = 2.85 + np.random.uniform(-0.05, 0.05)
-                sim_mfr = sim_mvr * melt_density
-                
-                # บันทึกผลไว้ใน Session
-                st.session_state['test_done'] = True
-                st.session_state['res_mvr'] = sim_mvr
-                st.session_state['res_mfr'] = sim_mfr
+        const aim = parseFloat(document.getElementById('aimAngle').value);
+        const power = parseFloat(document.getElementById('shootPower').value);
 
-    with tab_data:
-        if st.session_state.get('test_done', False):
-            st.subheader("📋 Measured Results")
-            r1, r2 = st.columns(2)
-            r1.metric("MVR (Melt Volume Rate)", f"{st.session_state['res_mvr']:.3f} cm³/10min")
-            r2.metric("MFR (Melt Mass Rate)", f"{st.session_state['res_mfr']:.3f} g/10min")
-            
-            st.divider()
-            # ตาราง Data Log
-            res_df = pd.DataFrame({
-                "Parameter": ["Sample ID", "Operator", "Standard", "Material", "Temp (°C)", "Load (kg)", "MFR (g/10min)", "MVR (cm³/10min)"],
-                "Value": [sample_id, operator, standard, material, set_temp, test_load, f"{st.session_state['res_mfr']:.3f}", f"{st.session_state['res_mvr']:.3f}"]
-            })
-            st.table(res_df)
-            
-            st.button("📥 Export Test Report (PDF/Excel)", help="Export summary report to local system")
-        else:
-            st.info("No test data available. Run measurement from 'Live Measuring Curve' tab.")
+        ballVelocity.set(aim * 15, power * 0.25, -power);
+        isMoving = true;
+
+        // AI โกลพุ่งเซฟสุ่มซ้าย/ขวา
+        gkVelocityX = (Math.random() - 0.5) * 6;
+    }
+
+    function resetBall() {
+        ball.position.set(0, 0.35, 6);
+        ballVelocity.set(0, 0, 0);
+        goalkeeper.position.set(0, 1.1, -14.8);
+        gkVelocityX = 0;
+        isMoving = false;
+        document.getElementById('result-text').innerText = "เล็งมุมแล้วกด SHOOT เพื่อยิงประตู!";
+        document.getElementById('result-text').style.color = "#00ff66";
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        if (isMoving) {
+            // บอลเคลื่อนที่ตามแรง
+            ball.position.addScaledVector(ballVelocity, 0.016);
+            ballVelocity.y -= 9.8 * 0.016; // แรงโน้มถ่วง
+            ball.rotation.x -= 0.1;
+
+            // โกลพุ่งตัว
+            if (goalkeeper.position.y > 0.5) {
+                goalkeeper.position.x += gkVelocityX * 0.016;
+            }
+
+            // ชนพื้น
+            if (ball.position.y <= 0.35) {
+                ball.position.y = 0.35;
+                ballVelocity.y *= -0.4; // เด้งพื้น
+            }
+
+            // ตรวจสอบเข้าประตู / ติดเซฟ
+            if (ball.position.z <= -14.8) {
+                isMoving = false;
+                
+                // ตรวจระยะชนโกล
+                const distToGK = ball.position.distanceTo(goalkeeper.position);
+                if (distToGK < 1.2) {
+                    document.getElementById('result-text').innerText = "❌ SAVED! ติดเซฟผู้รักษาประตู!";
+                    document.getElementById('result-text').style.color = "#ff3333";
+                } else if (Math.abs(ball.position.x) < 3.5 && ball.position.y < 3.0) {
+                    document.getElementById('result-text').innerText = "⚽ GOALLLLL! เข้าประตูสุดสวย!";
+                    document.getElementById('result-text').style.color = "#00ff66";
+                } else {
+                    document.getElementById('result-text').innerText = "OUT! ยิงออกนอกกรอบ!";
+                    document.getElementById('result-text').style.color = "#ffcc00";
+                }
+            }
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    animate();
+</script>
+</body>
+</html>
+"""
+
+# แสดงผล HTML 3D บน Streamlit
+components.html(html_code, height=650)
