@@ -4,12 +4,12 @@ import time
 
 # 1. ตั้งค่าหน้าจอ
 st.set_page_config(
-    page_title="AI Werewolf Master - With Audio Cues",
+    page_title="AI Werewolf Master",
     page_icon="🤖",
     layout="centered"
 )
 
-# Custom CSS ตกแต่งบรรยากาศ
+# Custom CSS
 st.markdown("""
     <style>
     .main { background-color: #0b0f19; color: white; }
@@ -19,28 +19,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ฟังก์ชันสำหรับส่งเสียงเอฟเฟกต์ผ่าน HTML5 Audio
-def play_sound(sound_type):
-    if sound_type == "action_complete":
-        # เสียง Chime สั้นๆ เมื่อทำภารกิจลับเสร็จ
-        sound_url = "https://actions.google.com/sounds/v1/tones/beep_short.ogg"
-    elif sound_type == "morning":
-        # เสียงระฆัง/สัญญาณเตือนเช้าวันใหม่
-        sound_url = "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm.ogg"
-    else:
-        return
-    
-    st.components.v1.html(
-        f"""
-        <audio autoplay style="display:none;">
-            <source src="{sound_url}" type="audio/ogg">
-        </audio>
-        """,
-        height=0,
-    )
+# ลิงก์ไฟล์เสียงมาตรฐาน MP3
+SOUND_BEEP = "https://www.soundjay.com/buttons/sounds/button-16a.mp3"
+SOUND_ALARM = "https://www.soundjay.com/clock/sounds/alarm-clock-01.mp3"
 
-st.title("🤖 AI Werewolf Master (ระบบเสียงปลุก)")
-st.caption("คุมเกมอัตโนมัติ 100% — มีสัญญาณเสียงบอกเมื่อทำภารกิจเสร็จ และเสียงปลุกยามเช้า 🔊")
+st.title("🤖 AI Werewolf Master")
+st.caption("ระบบคุมเกมอัตโนมัติ 100% (แก้ไขระบบเสียงเรียบร้อยแล้ว) 🔊")
 
 st.divider()
 
@@ -57,10 +41,8 @@ if 'day_count' not in st.session_state:
     st.session_state.day_count = 1
 if 'night_step' not in st.session_state:
     st.session_state.night_step = 0
-if 'night_kills' not in st.session_state:
-    st.session_state.night_kills = None
-if 'night_heals' not in st.session_state:
-    st.session_state.night_heals = None
+if 'play_sound_type' not in st.session_state:
+    st.session_state.play_sound_type = None
 
 # ==========================================
 # PHASE 1: SETUP
@@ -142,29 +124,33 @@ elif st.session_state.game_phase == 'VIEW_ROLES':
             st.rerun()
 
 # ==========================================
-# PHASE 3: AUTOMATED NIGHT PHASE WITH AUDIO
+# PHASE 3: AUTOMATED NIGHT PHASE
 # ==========================================
 elif st.session_state.game_phase == 'NIGHT_LOOP':
     st.subheader(f"🌙 ช่วงกลางคืน (คืนที่ {st.session_state.day_count})")
-    st.error("🙈 **ทุกคนในวงหลับตาแน่นๆ!** รอฟังเสียงสัญญาณจากเครื่อง")
+    st.error("🙈 **ทุกคนในวงหลับตาแน่นๆ!**")
     
     # Step 1: หมาป่า
     if st.session_state.night_step == 1:
         st.markdown("<div class='night-card'>", unsafe_allow_html=True)
         st.markdown("### 🐺 1. ช่วงเวลาของมนุษย์หมาป่า")
-        st.write("หมาป่าลืมตาขึ้นมารับเครื่องแล้วเลือกเป้าหมายที่จะฆ่า:")
         
         target_k = st.selectbox("เลือกคนที่หมาป่าต้องการฆ่า:", ["-- เลือกเป้าหมาย --"] + st.session_state.alive_players)
         
-        if st.button("🔔 ยืนยันเป้าหมายสังหาร (ส่งเสียงเตือน + ส่งเครื่องคืนกลางวง)"):
+        if st.button("🔔 ยืนยัน (เล่นเสียงเตือนเสร็จให้ส่งเครื่องคืนกลางวง)", type="primary"):
             if target_k != "-- เลือกเป้าหมาย --":
-                play_sound("action_complete") # เล่นเสียงสัญญาณสั้น
                 st.session_state.night_kills = target_k
-                st.session_state.night_step = 2
-                time.sleep(1)
-                st.rerun()
+                st.session_state.play_sound_type = "beep"
             else:
                 st.error("กรุณาเลือกเป้าหมายก่อนครับ!")
+        
+        # แสดงเครื่องเล่นเสียงหลังกด
+        if st.session_state.play_sound_type == "beep":
+            st.audio(SOUND_BEEP, autoplay=True)
+            if st.button("➡️ ส่งเครื่องคืนกลางวงแล้ว -> เข้าสู่บทบาทถัดไป"):
+                st.session_state.play_sound_type = None
+                st.session_state.night_step = 2
+                st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
     # Step 2: หมอ
@@ -173,16 +159,19 @@ elif st.session_state.game_phase == 'NIGHT_LOOP':
         if has_doc:
             st.markdown("<div class='night-card'>", unsafe_allow_html=True)
             st.markdown("### 🛡️ 2. ช่วงเวลาของหมอ")
-            st.write("หมอลืมตาขึ้นมารับเครื่องแล้วเลือกคนที่ต้องการปกป้อง:")
             
             target_h = st.selectbox("เลือกคนที่หมอคุ้มกัน:", ["-- ไม่คุ้มกันใคร --"] + st.session_state.alive_players)
             
-            if st.button("🔔 ยืนยันการปกป้อง (ส่งเสียงเตือน + ส่งเครื่องคืนกลางวง)"):
-                play_sound("action_complete") # เล่นเสียงสัญญาณสั้น
+            if st.button("🔔 ยืนยัน (เล่นเสียงเตือนเสร็จให้ส่งเครื่องคืนกลางวง)", type="primary"):
                 st.session_state.night_heals = target_h
-                st.session_state.night_step = 3
-                time.sleep(1)
-                st.rerun()
+                st.session_state.play_sound_type = "beep"
+            
+            if st.session_state.play_sound_type == "beep":
+                st.audio(SOUND_BEEP, autoplay=True)
+                if st.button("➡️ ส่งเครื่องคืนกลางวงแล้ว -> เข้าสู่บทบาทถัดไป"):
+                    st.session_state.play_sound_type = None
+                    st.session_state.night_step = 3
+                    st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.session_state.night_step = 3
@@ -194,7 +183,6 @@ elif st.session_state.game_phase == 'NIGHT_LOOP':
         if has_seer:
             st.markdown("<div class='night-card'>", unsafe_allow_html=True)
             st.markdown("### 🔮 3. ช่วงเวลาของผู้หยั่งรู้")
-            st.write("ผู้หยั่งรู้ลืมตาขึ้นมารับเครื่องแล้วเลือกส่องดูบทบาทลับ:")
             
             seer_t = st.selectbox("เลือกคนที่ต้องการส่อง:", ["-- เลือกคนที่จะส่อง --"] + st.session_state.alive_players)
             
@@ -205,26 +193,28 @@ elif st.session_state.game_phase == 'NIGHT_LOOP':
                 else:
                     st.success(f"🔮 คำตอบลับ: **{seer_t} คือ ฝ่ายดี/ชาวบ้าน 🟢**")
             
-            if st.button("🔔 อ่านแล้ว! (ส่งเสียงเตือน + ปิดเครื่องส่งคืนกลางวง)"):
-                play_sound("action_complete") # เล่นเสียงสัญญาณสั้น
-                st.session_state.night_step = 4
-                time.sleep(1)
-                st.rerun()
+            if st.button("🔔 อ่านแล้วกดฟังเสียงเตือน (แล้วส่งเครื่องคืนกลางวง)", type="primary"):
+                st.session_state.play_sound_type = "beep"
+            
+            if st.session_state.play_sound_type == "beep":
+                st.audio(SOUND_BEEP, autoplay=True)
+                if st.button("➡️ ส่งเครื่องคืนกลางวงแล้ว -> ปลุกทุกคน"):
+                    st.session_state.play_sound_type = None
+                    st.session_state.night_step = 4
+                    st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.session_state.night_step = 4
             st.rerun()
 
-    # Step 4: ปลุกทุกคนตอนเช้าด้วยเสียงนาฬิกาปลุก
+    # Step 4: ปลุกทุกคนด้วยเสียงปลุก
     elif st.session_state.night_step == 4:
         st.success("✅ กิจกรรมกลางคืนเสร็จสิ้นทั้งหมดแล้ว!")
         
-        # เล่นเสียงสัญญาณเตือนเช้าวันใหม่!
-        play_sound("morning")
+        st.markdown("### ⏰ กดปุ่มด้านล่างเพื่อส่งเสียงปลุกทุกคนในวง:")
+        st.audio(SOUND_ALARM, autoplay=True)
         
-        st.warning("🔊 **ฟังเสียงสัญญาณปลุก! ให้ทุกคนลืมตาขึ้นพร้อมกันได้เลย!**")
-        
-        if st.button("☀️ เข้าสู่ช่วงสรุปผลรุ่งเช้า", type="primary", use_container_width=True):
+        if st.button("☀️ เข้าสู่ช่วงสรุปผลรุ่งเช้า (ทุกคนลืมตาได้!)", type="primary", use_container_width=True):
             killed = st.session_state.night_kills
             healed = st.session_state.night_heals
             
@@ -303,5 +293,3 @@ elif st.session_state.game_phase == 'END':
         st.session_state.game_phase = 'SETUP'
         st.session_state.day_count = 1
         st.rerun()
-
-    
