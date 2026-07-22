@@ -3,21 +3,21 @@ import time
 import pandas as pd
 import numpy as np
 
-# 1. ตั้งค่าคอนฟิกหน้าจอให้กว้างและใช้ธีม Dark/Industrial เหมือนซอฟต์แวร์จริง
+# 1. ตั้งค่าคอนฟิกหน้าจอ
 st.set_page_config(
     page_title="GÖTTFERT miConnect - Melt Index Software",
     page_icon="🎛️",
     layout="wide"
 )
 
-# Custom CSS ตกแต่งให้เหมือนซอฟต์แวร์ควบคุมเครื่องจักร
+# Custom CSS (แก้คำว่า unsafe_allow_html ให้ถูกต้องแล้ว)
 st.markdown("""
     <style>
     .main { background-color: #1e1e1e; }
     .stMetric { background-color: #2b2b2b; padding: 10px; border-radius: 5px; border-left: 4px solid #ff6b00; }
     .status-box { background-color: #0d3b1e; color: #00ff66; padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; }
     </style>
-""", unsafe_allow_allow_html=True)
+""", unsafe_allow_html=True)
 
 # Header ซอฟต์แวร์จริง
 st.title("🎛️ GÖTTFERT miConnect v4.2")
@@ -72,7 +72,7 @@ with col_display:
     tab_graph, tab_data, tab_manual = st.tabs(["📈 Live Measuring Curve", "📊 Result Data Table", "📋 Operating Checklist"])
     
     with tab_manual:
-        st.write("** Checkpoints Before Test Run:**")
+        st.write("**Checkpoints Before Test Run:**")
         c1 = st.checkbox("Die inserted at Barrel bottom")
         c2 = st.checkbox("Sample resin (3-5g) loaded & tamped")
         c3 = st.checkbox("Piston positioned in Barrel")
@@ -96,9 +96,7 @@ with col_display:
                 st.success("✅ Pre-heat Complete! Weight released automatically.")
                 
                 # จำลองสร้างข้อมูลกราฟ Real-time
-                chart_place = st.empty()
                 time_steps = np.linspace(0, 30, 30)
-                # กราฟระยะการเคลื่อนของ Piston (mm)
                 distance_data = np.cumsum(np.random.normal(0.85, 0.05, 30))
                 
                 chart_df = pd.DataFrame({
