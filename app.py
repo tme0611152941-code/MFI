@@ -1,13 +1,12 @@
 import streamlit as st
 import random
-import time
 
 # --------------------------------------------------
 # 1. ตั้งค่าหน้าเว็บ
 # --------------------------------------------------
 st.set_page_config(
-    page_title="Extruder Overload: Polymer Master",
-    page_icon="🔬",
+    page_title="Rubber Tech Exam Prep Game!",
+    page_icon="🌳",
     layout="centered"
 )
 
@@ -18,25 +17,24 @@ st.markdown("""
         color: #F8FAFC;
     }
     .stButton>button {
-        background: linear-gradient(135deg, #6366F1 0%, #A855F7 100%);
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
         color: white;
         font-weight: bold;
         border-radius: 12px;
         border: none;
         padding: 12px 24px;
-        box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.39);
         width: 100%;
     }
-    .order-box {
+    .quiz-box {
         background-color: #1E293B;
-        border-left: 6px solid #8B5CF6;
+        border-left: 6px solid #10B981;
         padding: 20px;
         border-radius: 12px;
         margin-bottom: 20px;
     }
     .badge {
         background-color: #334155;
-        color: #38BDF8;
+        color: #34D399;
         padding: 4px 8px;
         border-radius: 6px;
         font-size: 0.85em;
@@ -46,218 +44,166 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --------------------------------------------------
-# 2. ฐานข้อมูลพอลิเมอร์ครบทุกหมวด ทุกเกรด และผู้ผลิต
+# 2. คลังข้อสอบวิชา Rubber Technology
 # --------------------------------------------------
-POLYMER_DATABASE = [
-    # --- หมวด 1: Biopolymers & Bio-composites ---
+RUBBER_QUESTIONS = [
+    # --- หมวด 1: โครงสร้างทางเคมี & พื้นฐาน ---
     {
-        "id": 1,
-        "category": "🌱 Biopolymers & Composites",
-        "material": "PLA (Polylactic Acid)",
-        "grade": "Ingeo™ Biopolymer 4032D (Film Grade)",
-        "producer": "NatureWorks LLC / GC International",
-        "desc": "เป่าฟิล์มย่อยสลายได้สำหรับถุงใส่อาหาร ห้ามใช้อุณหภูมิสูงเกินไปเพราะเสี่ยง Thermal Degradation และ MFI เปลี่ยน!",
-        "target_temp": (180, 200),
-        "target_rpm": (40, 60),
-        "target_additive": (5, 10),
-        "target_cooling": (6, 10)
+        "category": "🧪 โครงสร้างทางเคมี & พื้นฐาน",
+        "question": "ยางธรรมชาติ (Natural Rubber: NR) มีโครงสร้างทางเคมีหลักเป็นแบบใด?",
+        "options": [
+            "cis-1,4-polyisoprene",
+            "trans-1,4-polyisoprene (Gutta-percha)",
+            "Styrene-Butadiene Copolymer",
+            "1,2-polybutadiene"
+        ],
+        "answer": "cis-1,4-polyisoprene",
+        "explanation": "ยางธรรมชาติประกอบด้วย cis-1,4-polyisoprene เกือบ 100% ซึ่งทำให้ยางมีความยืดหยุ่นสูงและเกิด Crystallization induced by strain ได้ ส่วน trans-1,4 คือ Gutta-percha ที่แข็งและไม่ยืดหยุ่น"
     },
     {
-        "id": 2,
-        "category": "🌱 Biopolymers & Composites",
-        "material": "PLA/PBAT/Biochar Composite",
-        "grade": "Custom Senior Research Grade (Bio-composite)",
-        "producer": "SUT Laboratory / In-house Compound",
-        "desc": "คอมพาวนด์ฟิล์มเกษตรผสมไบโอชา ห้ามใช้ Shear force สูงเกินไป เพราะไบโอชาจะแตกละเอียดส่งผลเสียต่อ Tensile Strength!",
-        "target_temp": (160, 180),
-        "target_rpm": (30, 50),
-        "target_additive": (10, 20),
-        "target_cooling": (8, 12)
-    },
-    
-    # --- หมวด 2: Commodity Plastics ---
-    {
-        "id": 3,
-        "category": "📦 Commodity Plastics",
-        "material": "HDPE (High-Density Polyethylene)",
-        "grade": "InnoPlus HD5000S (Injection Grade)",
-        "producer": "PTT Global Chemical (GC)",
-        "desc": "งานฉีดขึ้นรูปลังพลาสติกบรรจุสินค้า ต้องการ Flowability ดี แต่ห้ามเกิด Sink Mark (รอยบุ๋ม) จากการเย็นตัวไม่เท่ากัน!",
-        "target_temp": (210, 240),
-        "target_rpm": (70, 90),
-        "target_additive": (0, 5),
-        "target_cooling": (15, 25)
-    },
-    {
-        "id": 4,
-        "category": "📦 Commodity Plastics",
-        "material": "PP (Polypropylene Random Copolymer)",
-        "grade": "SCG PP P700J (Injection Grade)",
-        "producer": "SCG Chemicals (SCGC)",
-        "desc": "กล่องบรรจุอาหารใสทนความร้อน ไมโครเวฟได้ ห้ามเกิด Warpage (ชิ้นงานบิดโก่ง) เด็ดขาด!",
-        "target_temp": (200, 230),
-        "target_rpm": (60, 80),
-        "target_additive": (2, 8),
-        "target_cooling": (10, 18)
+        "category": "🧪 โครงสร้างทางเคมี & พื้นฐาน",
+        "question": "สารชนิดใดที่เป็น Non-rubber components ในน้ำยางสดและมีส่วนช่วยให้ยางธรรมชาติมีสมบัติเฉพาะตัว เช่น Green Strength สูง?",
+        "options": [
+            "โปรตีนและลิพิด (Proteins & Lipids)",
+            "ซิลิกาและแคลเซียม (Silica & Calcium)",
+            "เซลลูโลสและลิกนิน (Cellulose & Lignin)",
+            "ฟีนอลและแทนนิน (Phenol & Tannin)"
+        ],
+        "answer": "โปรตีนและลิพิด (Proteins & Lipids)",
+        "explanation": "Non-rubber components ในน้ำยางสด เช่น โปรตีนและลิพิด ทำหน้าที่เป็น Natural antioxidants และช่วยเกาะเกี่ยวโครงสร้าง (Branching) ทำให้ยาง NR มี Green Strength สูง"
     },
 
-    # --- หมวด 3: Engineering Plastics ---
+    # --- หมวด 2: ยางสังเคราะห์ (Synthetic Rubbers) ---
     {
-        "id": 5,
-        "category": "⚙️ Engineering Plastics",
-        "material": "PA66 (Polyamide 66 / Nylon 66)",
-        "grade": "Ultramid® A3K (Unreinforced)",
-        "producer": "BASF",
-        "desc": "ฉีดเฟืองเกียร์พลาสติกในเครื่องจักรอุตสาหกรรม ต้องระวัง Hydrolysis Degradation ถ้าความชื้นสูง และห้ามใช้อุณหภูมิต่ำเกินไปจนพลาสติกไม่หลอม!",
-        "target_temp": (270, 295),
-        "target_rpm": (50, 75),
-        "target_additive": (1, 5),
-        "target_cooling": (12, 20)
+        "category": "🏭 ยางสังเคราะห์ (Synthetic Rubbers)",
+        "question": "ยางสังเคราะห์ชนิดใดที่นิยมนำมาผลิต 'ยางรถยนต์' ร่วมกับยางธรรมชาติมากที่สุด เนื่องจากทนต่อการขัดถู (Abrasion Resistance) ได้ดีเยี่ยม?",
+        "options": [
+            "SBR (Styrene-Butadiene Rubber)",
+            "NBR (Nitrile Butadiene Rubber)",
+            "EPDM (Ethylene Propylene Diene Monomer)",
+            "CR (Chloroprene Rubber)"
+        ],
+        "answer": "SBR (Styrene-Butadiene Rubber)",
+        "explanation": "SBR เป็นยางสังเคราะห์ที่ใช้งานมากที่สุดในอุตสาหกรรมยางรถยนต์เพราะทนการขัดถูดีและราคาถูก ส่วน NBR เด่นเรื่องทนน้ํามัน, EPDM เด่นเรื่องทนสภาพอากาศ/Ozone, CR (Neoprene) เด่นเรื่องทนไฟและน้ำมัน"
     },
     {
-        "id": 6,
-        "category": "⚙️ Engineering Plastics",
-        "material": "PC (Polycarbonate)",
-        "grade": "Makrolon® 2407 (Light Guide Grade)",
-        "producer": "Covestro",
-        "desc": "ฉีดเลนส์โคมไฟหน้ารถยนต์ โปร่งใสไร้รอยคราบ ห้ามเกิด Yellowing Index (ชิ้นงานเหลือง) จากการไหม้ในบาร์เรล!",
-        "target_temp": (280, 310),
-        "target_rpm": (40, 60),
-        "target_additive": (0, 3),
-        "target_cooling": (15, 25)
+        "category": "🏭 ยางสังเคราะห์ (Synthetic Rubbers)",
+        "question": "หากต้องการผลิต 'ท่อยางส่งน้ำมันเชื้อเพลิง' ควรเลือกใช้ยางสังเคราะห์ชนิดใด?",
+        "options": [
+            "NBR (Nitrile Rubber)",
+            "NR (Natural Rubber)",
+            "SBR (Styrene Rubber)",
+            "BR (Polybutadiene Rubber)"
+        ],
+        "answer": "NBR (Nitrile Rubber)",
+        "explanation": "NBR มีหมู่ Nitrile (-CN) ซึ่งเป็นขั้วสูง ทำให้ทนต่อสารละลายไม่มีขั้วอย่างน้ำมันเชื้อเพลิงปิโตรเลียมได้ดีเยี่ยม ยิ่งมี % Acrylonitrile (ACN) สูง ยิ่งทนน้ำมันได้ดี"
     },
 
-    # --- หมวด 4: High-Performance Plastics ---
+    # --- หมวด 3: กระบวนการแปรรูป & เกรดมาตรฐาน ---
     {
-        "id": 7,
-        "category": "🚀 High-Performance Plastics",
-        "material": "PEEK (Polyether Ether Ketone)",
-        "grade": "VICTREX™ PEEK 450G",
-        "producer": "Victrex plc",
-        "desc": "ชิ้นส่วนการแพทย์/การบินและอวกาศ ทนอุณหภูมิสูงและเคมีรุนแรง ต้องใช้อุณหภูมิหลอมสูงมาก ห้ามหล่อเย็นเร็วเกินไปจน Crystallinity ตก!",
-        "target_temp": (360, 390),
-        "target_rpm": (30, 50),
-        "target_additive": (0, 2),
-        "target_cooling": (25, 40)
+        "category": "⚙️ กระบวนการแปรรูป & เกรดมาตรฐาน",
+        "question": "กระบวนการ Mastication มีวัตถุประสงค์หลักเพื่ออะไร?",
+        "options": [
+            "ลดโมเลกุล (Molecular Weight) และความหนืด (Viscosity) ของยาง",
+            "เร่งปฏิกิริยาการคงรูปด้วยกำมะถัน",
+            "เพิ่มความหนาแน่นและค่า Tensile Strength",
+            "กำจัดน้ำและโปรตีนออกจากน้ำยาง"
+        ],
+        "answer": "ลดโมเลกุล (Molecular Weight) และความหนืด (Viscosity) ของยาง",
+        "explanation": "Mastication คือการตัดสายโซ่โมเลกุลยางด้วยแรงตัดเฉือน (Shear) และความร้อน เพื่อลดความหนืด ทำให้ผสมสารเคมีเติมแต่ง (Compounding Ingredients) เข้ากันได้ง่ายขึ้น"
+    },
+    {
+        "category": "⚙️ กระบวนการแปรรูป & เกรดมาตรฐาน",
+        "question": "ยางแท่งมาตรฐานไทย (Standard Thai Rubber: STR) เกรดใดที่มีความบริสุทธิ์สูงที่สุด และมีค่า Dirt Content ต่ำที่สุด?",
+        "options": [
+            "STR XL / STR 5",
+            "STR 10",
+            "STR 20",
+            "STR 50"
+        ],
+        "answer": "STR XL / STR 5",
+        "explanation": "STR XL และ STR 5 เป็นยางแท่งเกรดพรีเมียม ทำจากน้ำยางสด (Latex) มีสิ่งสกปรก (Dirt) น้อยมาก ไม่เกิน 0.03-0.05% ส่วน STR 10/20 ทำจากยางก้อนคัพลัมพ์ (Cup lump) สิ่งสกปรกจะเยอะกว่า"
+    },
+
+    # --- หมวด 4: การคงรูป (Vulcanization) & สารเคมี ---
+    {
+        "category": "🔥 Vulcanization & Compounding",
+        "question": "ปฏิกิริยา Vulcanization แบบดั้งเดิมที่ใช้ Sulphur จะเกิดพันธะข้ามสายโซ่ (Crosslink) แบบใดระหว่างสายโซ่ยาง?",
+        "options": [
+            "Sulfide Crosslinks (-S- / -S-S- / -Sn-)",
+            "Carbon-Carbon Direct Crosslinks",
+            "Ester Linkages",
+            "Hydrogen Bonds"
+        ],
+        "answer": "Sulfide Crosslinks (-S- / -S-S- / -Sn-)",
+        "explanation": "การคงรูปด้วยกำมะถันทำให้เกิดพันธะ Mono-, Di-, หรือ Poly-sulfidic crosslinks ยึดสายโซ่เข้าด้วยกัน ทำให้ยางเปลี่ยนจาก Viscoelastic fluid กลายเป็น Rubber elastic solid ที่ไม่ละลาย"
+    },
+    {
+        "category": "🔥 Vulcanization & Compounding",
+        "question": "สารใดทำหน้าที่เป็น 'Activator System' หลักที่ช่วยเสริมประสิทธิภาพของสารเร่งการคงรูป (Accelerators) ในสูตรยาง?",
+        "options": [
+            "ZnO + Stearic acid",
+            "Carbon Black + Silica",
+            "Parrafin wax + DOP",
+            "CBS + TMTD"
+        ],
+        "answer": "ZnO + Stearic acid",
+        "explanation": "ZnO (Zinc Oxide) ทำหน้าที่เป็น Activator ร่วมกับ Stearic Acid เกิดเป็น Zinc Stearate ซึ่งช่วยให้สารเร่งคงรูป (Accelerator) ทำงานได้อย่างมีประสิทธิภาพสูงสุด"
     }
 ]
 
 # --------------------------------------------------
-# 3. ระบบจัดการสถานะเกม (Session State)
+# 3. Session State Management
 # --------------------------------------------------
 if 'score' not in st.session_state:
     st.session_state.score = 0
-if 'current_order_idx' not in st.session_state:
-    st.session_state.current_order_idx = random.randint(0, len(POLYMER_DATABASE) - 1)
+if 'q_idx' not in st.session_state:
+    st.session_state.q_idx = 0
+if 'answered' not in st.session_state:
+    st.session_state.answered = False
 
-# Function สำหรับสุ่มออเดอร์ใหม่
-def next_order():
-    st.session_state.current_order_idx = random.randint(0, len(POLYMER_DATABASE) - 1)
+def next_question():
+    st.session_state.q_idx = (st.session_state.q_idx + 1) % len(RUBBER_QUESTIONS)
+    st.session_state.answered = False
 
 # --------------------------------------------------
 # 4. หน้าตา UI
 # --------------------------------------------------
-st.title("🔬 Extruder Overload: Polymer Master")
-st.caption("🤖 เกมจำลองกระบวนการแปรรูปพอลิเมอร์สมจริง แข่งกับ AI ลูกค้าสุดเฮี้ยบ")
+st.title("🌳 Rubber Tech Exam Prep Master")
+st.caption("🎯 เกมตะลุยโจทย์ทบทวนวิชา Rubber Technology เตรียมพร้อมสอบวันเสาร์นี้!")
 
-# โหมดเลือกเกรดด้วยตัวเอง หรือสุ่ม
-st.sidebar.header("🎯 ตัวเลือกโหมดเล่น")
-mode = st.sidebar.radio("โหมดการสุ่มออเดอร์:", ["🎲 สุ่มเกรดพลาสติกไปเรื่อยๆ", "📌 เลือกเกรดที่อยากทดลองเอง"])
+q = RUBBER_QUESTIONS[st.session_state.q_idx]
 
-if mode == "📌 เลือกเกรดที่อยากทดลองเอง":
-    selected_name = st.sidebar.selectbox(
-        "เลือกเกรดพลาสติก:",
-        [f"{p['material']} - {p['grade']}" for p in POLYMER_DATABASE]
-    )
-    for idx, p in enumerate(POLYMER_DATABASE):
-        if f"{p['material']} - {p['grade']}" == selected_name:
-            st.session_state.current_order_idx = idx
-
-order = POLYMER_DATABASE[st.session_state.current_order_idx]
-
-st.metric("🏆 คะแนนเกียรตินิยมวิศวกร", f"{st.session_state.score} EXP")
+col_score, col_progress = st.columns(2)
+with col_score:
+    st.metric("🏆 คะแนนที่ได้", f"{st.session_state.score} คะแนน")
+with col_progress:
+    st.caption(f"ข้อที่ {st.session_state.q_idx + 1} / {len(RUBBER_QUESTIONS)}")
 
 st.markdown(f"""
-<div class="order-box">
-    <span class="badge">{order['category']}</span>
-    <h3 style="margin-top:10px; color:#F43F5E;">{order['material']}</h3>
-    <p><b>เกรดพลาสติก:</b> <code style="color:#A855F7;">{order['grade']}</code></p>
-    <p><b>บริษัทผู้ผลิต:</b> 🏢 {order['producer']}</p>
-    <hr style="border-color:#334155;">
-    <p><b>ข้อกำหนดลูกค้า (Requirement):</b><br><i>"{order['desc']}"</i></p>
+<div class="quiz-box">
+    <span class="badge">{q['category']}</span>
+    <h3 style="margin-top:10px; color:#F8FAFC;">{q['question']}</h3>
 </div>
 """, unsafe_allow_html=True)
 
-st.subheader("🎛️ ตั้งค่ากระบวนการแปรรูป (Processing Parameters)")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    temp = st.slider("🌡️ Barrel Temp (°C)", 140, 420, 200, step=5)
-    rpm = st.slider("🔄 Screw Speed (RPM)", 10, 120, 50, step=5)
-
-with col2:
-    additive = st.slider("🧪 Additive / Plasticizer (%)", 0, 30, 5, step=1)
-    cooling = st.slider("❄️ Cooling Time (s)", 2, 45, 10, step=1)
+# ตัวเลือก
+user_choice = st.radio("เลือกคำตอบที่ถูกต้อง:", q['options'], disabled=st.session_state.answered)
 
 st.write("---")
 
-col_btn1, col_btn2 = st.columns(2)
-
-with col_btn1:
-    run_btn = st.button("🚀 สั่งรันเครื่อง (Run Process)")
-
-with col_btn2:
-    st.button("🔄 เปลี่ยนไปเกรดถัดไป (Random Next)", on_click=next_order)
-
-if run_btn:
-    with st.spinner("⚙️ พอลิเมอร์กำลังเคลื่อนผ่าน Feed Zone -> Compression Zone -> Metering Zone..."):
-        time.sleep(1.2)
-        
-        defects = []
-        deductions = 0
-        
-        # 1. เช็ก Barrel Temp
-        if temp < order['target_temp'][0]:
-            defects.append(f"🥶 Temp ต่ำกว่า Processing Window ({order['target_temp'][0]}°C): พอลิเมอร์ไม่หลอมสมบูรณ์ เกิด Unmelted Pellets อุดตัน Die!")
-            deductions += 30
-        elif temp > order['target_temp'][1]:
-            defects.append(f"🔥 Temp สูงเกินเกณฑ์ ({order['target_temp'][1]}°C): เกิด Thermal Degradation สายโซ่ขาด ชิ้นงานไหม้ดำและเกิดก๊าซพิษ!")
-            deductions += 35
-
-        # 2. เช็ก Screw Speed (RPM)
-        if rpm > order['target_rpm'][1]:
-            defects.append("🌀 RPM สูงเกินไป: เกิด Shear Heating สะสมสูงเกินไป สายโซ่พอลิเมอร์ถูกตัดขาด (Shear Degradation) และเกิดฟองอากาศ")
-            deductions += 25
-        elif rpm < order['target_rpm'][0]:
-            defects.append("🐢 RPM ช้าเกินไป: Residence Time ในบาร์เรลนานเกินไป พลาสติกเสื่อมสภาพ และได้ Output ต่ำกว่าเป้าหมาย")
-            deductions += 15
-
-        # 3. เช็ก Additive
-        if additive > order['target_additive'][1]:
-            defects.append("💧 ใส่ Additive/Plasticizer มากเกินไป: เกิด Phase Separation (เยิ้มออกมาหน้าชิ้นงาน) และค่า Tensile Strength ตกอย่างรุนแรง")
-            deductions += 20
-        elif additive < order['target_additive'][0]:
-            defects.append("🧱 ใส่ Additive น้อยเกินไป: ชิ้นงานเปราะแตกง่าย ไม่ได้สมบัติทางกลตามสเปกของเกรดนี้")
-            deductions += 20
-
-        # 4. เช็ก Cooling Time
-        if cooling < order['target_cooling'][0]:
-            defects.append("⏱️ Cooling Time น้อยเกินไป: ชิ้นงานยังไม่เซ็ตตัว เกิด Warpage (บิดโก่ง) หรือ Sink Mark (รอยบุ๋ม)")
-            deductions += 20
-
-        # แสดงผลลัพธ์
-        if len(defects) == 0:
+if not st.session_state.answered:
+    if st.button("ส่งคำตอบ (Submit)"):
+        st.session_state.answered = True
+        if user_choice == q['answer']:
             st.balloons()
-            st.success("🎉 PERFECT! ขึ้นรูปชิ้นงานได้ตรงตามสเปก โครงสร้างผลึก (Crystallinity) และสมบัติทางกลสมบูรณ์แบบ!")
-            st.session_state.score += 150
-            st.info("🤖 **AI QC Inspector:** 'ผ่าน QC 100%! เกรดนี้แปรรูปยากมาก แต่คุณทำได้เนียนจริงๆ!'")
+            st.success("🎉 ถูกต้องครับ! เก่งมากแต้ม!")
+            st.session_state.score += 10
         else:
-            st.error("💥 QC Reject! ชิ้นงานเสียสภาพ พบข้อผิดพลาดทางเทคนิคดังนี้:")
-            for d in defects:
-                st.write(f"- {d}")
-            
-            gained_score = max(0, 100 - deductions)
-            st.session_state.score += gained_score
-            st.warning(f"📉 ได้รับคะแนนรอบนี้: {gained_score} / 100 คะแนน")
-            st.info("🤖 **AI QC Inspector:** 'ชิ้นงานเกรดนี้ราคาแพงมากนะ! ปรับค่า Parameter ใหม่ แล้วลองดูอีกที!'")
+            st.error(f"❌ ยังไม่ถูกครับ! คำตอบที่ถูกต้องคือ: {q['answer']}")
+        st.rerun()
+
+else:
+    # เฉลยและคำอธิบายอย่างละเอียด
+    st.info(f"💡 **คำอธิบายสำหรับข้อสอบ:** {q['explanation']}")
+    st.button("ข้อถัดไป ➡️", on_click=next_question)
