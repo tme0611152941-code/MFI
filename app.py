@@ -1,255 +1,288 @@
+import streamlit as st
 import random
 import time
-import winsound  # ไลบรารีสำหรับทำเสียงเตือนปลุกบน Windows / Python
 
 # --------------------------------------------------
-# ฟังก์ชันทำเสียงปลุก (Alarm Sounds)
+# ตั้งค่าหน้าเว็บ
 # --------------------------------------------------
-def play_morning_alarm():
-    # เสียงปลุกตอนเช้า (ดังสลับความถี่แบบนาฬิกาปลุก iOS)
-    for _ in range(3):
-        winsound.Beep(1000, 150)  # ความถี่ 1000Hz ยาว 0.15 วิ
-        winsound.Beep(1500, 150)  # ความถี่ 1500Hz ยาว 0.15 วิ
-        time.sleep(0.1)
+st.set_page_config(page_title="Werewolf Game", page_icon="🐺", layout="centered")
 
-def play_action_sound():
-    # เสียงเตือนเมื่อทำภารกิจ/โหวตเสร็จ
-    winsound.Beep(800, 200)
-
-def play_gameover_alarm():
-    # เสียงปลุกรัวๆ เมื่อจบเกม
-    for i in range(4):
-        winsound.Beep(1200 - (i * 200), 200)
+st.title("🐺 Werewolf Game (เกมหมาป่า)")
+st.write("เกมล่าหมาป่าระบบ Web App เล่นผ่านเว็บ/iPad/มือถือ")
 
 # --------------------------------------------------
-# 1. ตั้งค่าผู้เล่นและสุ่มบทบาท (Roles Setup)
+# ฟังก์ชันเล่นเสียงเตือน (HTML5 Audio เล่นผ่านเบราว์เซอร์)
 # --------------------------------------------------
-print("=== WELCOME TO WEREWOLF GAME ===")
-num_players = int(input("Enter number of players (6-10): "))
-
-players = []
-for i in range(1, num_players + 1):
-    players.append("Player_" + str(i))
-
-roles_pool = ['Werewolf', 'Seer', 'Bodyguard', 'Witch', 'Hunter']
-
-if num_players >= 8:
-    roles_pool.append('Werewolf')
-
-while len(roles_pool) < num_players:
-    roles_pool.append('Villager')
-
-random.shuffle(roles_pool)
-
-player_roles = list(roles_pool)
-player_status = [] 
-for p in players:
-    player_status.append(True)
-
-witch_heal = True
-witch_poison = True
-
-print("\n--- ASSIGNING ROLES ---")
-for i in range(num_players):
-    print(players[i] + " is " + player_roles[i])
+def play_sound(sound_type):
+    if sound_type == "morning":
+        # เสียงนาฬิกาปลุกตอนเช้า
+        sound_url = "https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"
+    elif sound_type == "action":
+        # เสียงเตือนเมื่อทำภารกิจเสร็จ
+        sound_url = "https://actions.google.com/sounds/v1/beeps/short_beep_high.ogg"
+    elif sound_type == "gameover":
+        # เสียงจบเกม
+        sound_url = "https://actions.google.com/sounds/v1/cartoon/clapping.ogg"
     
-print("\nGame start in 3 seconds...")
-time.sleep(3)
+    st.components.v1.html(
+        f"""
+        <audio autoplay style="display:none;">
+          <source src="{sound_url}" type="audio/ogg">
+        </audio>
+        """,
+        height=0,
+    )
 
 # --------------------------------------------------
-# 2. เริ่มลูปเกม (Game Loop)
+# ระบบ Session State (เก็บสถานะเกมบน Streamlit)
 # --------------------------------------------------
-game_over = False
-winner = ""
+if 'game_started' not in st.session_state:
+    st.session_state.game_started = False
+    st.session_state.phase = "NIGHT_WOLF" # NIGHT_WOLF, NIGHT_SEER, NIGHT_GUARD, NIGHT_WITCH, DAY, VOTING, GAMEOVER
+    st.session_state.players = []
+    st.session_state.roles = []
+    st.session_state.status = [] # True = รอด, False = ตาย
+    st.session_state.witch_heal = True
+    st.session_state.witch_poison = True
+    st.session_state.night_logs = []
+    st.session_state.target_wolf = None
+    st.session_state.protected_player = None
+    st.session_state.witch_kill_target = None
+    st.session_state.witch_saved = False
 
-while not game_over:
+# --------------------------------------------------
+# 1. หน้าเริ่มเกม / ตั้งค่าจำนวนผู้เล่น
+# --------------------------------------------------
+if not st.session_state.game_started:
+    st.subheader("⚙️ ตั้งค่าเกม")
+    num_players = st.number_input("จำนวนผู้เล่น (6-10 คน):", min_value=6, max_value=10, value=6)
     
-    # ----------------------------------------------
-    # NIGHT PHASE (ช่วงกลางคืน)
-    # ----------------------------------------------
-    print("\n==========================================")
-    print("🌙 NIGHT PHASE - Everyone close your eyes...")
-    print("==========================================")
-    
-    target_wolf = ""
-    protected_player = ""
-    witch_kill_target = ""
-    witch_saved = False
-    
-    # --- 1. WEREWOLF TURN ---
-    print("\n[🐺 Werewolf Turn]")
-    for i in range(num_players):
-        if player_status[i]:
-            print(str(i+1) + ". " + players[i])
+    if st.button("🚀 เริ่มเกม (Start Game)"):
+        players = [f"Player_{i+1}" for i in range(num_players)]
+        roles_pool = ['Werewolf', 'Seer', 'Bodyguard', 'Witch', 'Hunter']
+        
+        if num_players >= 8:
+            roles_pool.append('Werewolf')
             
-    wolf_choice = int(input("Werewolf! Choose player index to kill: ")) - 1
-    target_wolf = players[wolf_choice]
-    play_action_sound()  # เสียงเตือนเมื่อหมาป่าทำภารกิจเสร็จ
-    
-    # --- 2. SEER TURN ---
-    print("\n[🔮 Seer Turn]")
-    seer_alive = False
-    for i in range(num_players):
-        if player_roles[i] == 'Seer' and player_status[i]:
-            seer_alive = True
+        while len(roles_pool) < num_players:
+            roles_pool.append('Villager')
             
-    if seer_alive:
-        seer_choice = int(input("Seer! Choose player index to check: ")) - 1
-        if player_roles[seer_choice] == 'Werewolf':
-            print(">>> Result: This player is a WEREWOLF! 🐺")
+        random.shuffle(roles_pool)
+        
+        st.session_state.players = players
+        st.session_state.roles = roles_pool
+        st.session_state.status = [True] * num_players
+        st.session_state.game_started = True
+        st.session_state.phase = "NIGHT_WOLF"
+        st.rerun()
+
+else:
+    # แสดงรายชื่อผู้เล่นและบทบาท (เปิด-ปิดดูได้)
+    with st.expander("👁️ ดูรายชื่อผู้เล่นและบทบาททั้งหมด (ลับ)"):
+        for i in range(len(st.session_state.players)):
+            status_text = "🟢 มีชีวิต" if st.session_state.status[i] else "💀 ตายแล้ว"
+            st.write(f"**{st.session_state.players[i]}**: {st.session_state.roles[i]} ({status_text})")
+
+    st.divider()
+
+    # --------------------------------------------------
+    # 2. ช่วงกลางคืน (NIGHT PHASES)
+    # --------------------------------------------------
+    
+    # --- 🐺 หมาป่าเลือกเหยื่อ ---
+    if st.session_state.phase == "NIGHT_WOLF":
+        st.subheader("🌙 กลางคืน: [🐺 หมาป่า ตื่นขึ้นมา]")
+        st.write("เลือกผู้เล่น 1 คนที่ต้องการสังหาร:")
+        
+        alive_players = [st.session_state.players[i] for i in range(len(st.session_state.players)) if st.session_state.status[i]]
+        target = st.radio("เลือกเหยื่อ:", alive_players, key="wolf_choice")
+        
+        if st.button("ยืนยันการเลือกของหมาป่า"):
+            st.session_state.target_wolf = target
+            play_sound("action")
+            st.session_state.phase = "NIGHT_SEER"
+            st.rerun()
+
+    # --- 🔮 หมอดูส่องบทบาท ---
+    elif st.session_state.phase == "NIGHT_SEER":
+        st.subheader("🌙 กลางคืน: [🔮 หมอดู ตื่นขึ้นมา]")
+        
+        seer_alive = any(st.session_state.roles[i] == 'Seer' and st.session_state.status[i] for i in range(len(st.session_state.players)))
+        
+        if seer_alive:
+            check_target = st.selectbox("เลือกผู้เล่นที่ต้องการตรวจสอบ:", st.session_state.players, key="seer_choice")
+            if st.button("ตรวจสอบบทบาท"):
+                target_index = st.session_state.players.index(check_target)
+                is_wolf = st.session_state.roles[target_index] == 'Werewolf'
+                if is_wolf:
+                    st.error(f"🔍 ผลการตรวจ: **{check_target}** เป็น 🐺 WEREWOLF!")
+                else:
+                    st.success(f"🔍 ผลการตรวจ: **{check_target}** เป็น 🧑 คนธรรมดา (ไม่ใช่หมาป่า)")
+                play_sound("action")
+                time.sleep(2)
+                st.session_state.phase = "NIGHT_GUARD"
+                st.rerun()
         else:
-            print(">>> Result: This player is NOT a werewolf. 🧑")
-        play_action_sound()  # เสียงเตือนเมื่อหมอดูส่องเสร็จ
-    else:
-        print("(Seer is not in game or dead)")
+            st.info("(หมอดูเสียชีวิตแล้ว หรือไม่มีในเกม)")
+            if st.button("ข้ามไปยังบทบาทถัดไป"):
+                st.session_state.phase = "NIGHT_GUARD"
+                st.rerun()
 
-    # --- 3. BODYGUARD TURN ---
-    print("\n[🛡️ Bodyguard Turn]")
-    guard_alive = False
-    for i in range(num_players):
-        if player_roles[i] == 'Bodyguard' and player_status[i]:
-            guard_alive = True
-            
-    if guard_alive:
-        guard_choice = int(input("Bodyguard! Choose player index to protect: ")) - 1
-        protected_player = players[guard_choice]
-        play_action_sound()  # เสียงเตือนเมื่อบอดี้การ์ดเลือกเสร็จ
-    else:
-        print("(Bodyguard is not in game or dead)")
+    # --- 🛡️ บอดี้การ์ดปกป้อง ---
+    elif st.session_state.phase == "NIGHT_GUARD":
+        st.subheader("🌙 กลางคืน: [🛡️ บอดี้การ์ด ตื่นขึ้นมา]")
+        
+        guard_alive = any(st.session_state.roles[i] == 'Bodyguard' and st.session_state.status[i] for i in range(len(st.session_state.players)))
+        
+        if guard_alive:
+            alive_players = [st.session_state.players[i] for i in range(len(st.session_state.players)) if st.session_state.status[i]]
+            guard_target = st.selectbox("เลือกผู้เล่นที่ต้องการปกป้องคืนนี้:", alive_players, key="guard_choice")
+            if st.button("ยืนยันการปกป้อง"):
+                st.session_state.protected_player = guard_target
+                play_sound("action")
+                st.session_state.phase = "NIGHT_WITCH"
+                st.rerun()
+        else:
+            st.info("(บอดี้การ์ดเสียชีวิตแล้ว หรือไม่มีในเกม)")
+            if st.button("ข้ามไปยังบทบาทถัดไป"):
+                st.session_state.phase = "NIGHT_WITCH"
+                st.rerun()
 
-    # --- 4. WITCH TURN ---
-    print("\n[🧙‍♀️ Witch Turn]")
-    witch_alive = False
-    for i in range(num_players):
-        if player_roles[i] == 'Witch' and player_status[i]:
-            witch_alive = True
+    # --- 🧙‍♀️ แม่มดยาพิษ/ยาช่วย ---
+    elif st.session_state.phase == "NIGHT_WITCH":
+        st.subheader("🌙 กลางคืน: [🧙‍♀️ แม่มด ตื่นขึ้นมา]")
+        
+        witch_alive = any(st.session_state.roles[i] == 'Witch' and st.session_state.status[i] for i in range(len(st.session_state.players)))
+        
+        if witch_alive:
+            st.write(f"คืนนี้หมาป่าจ้องจะเล่นงาน: **{st.session_state.target_wolf}**")
             
-    if witch_alive:
-        print("Tonight, " + target_wolf + " was targeted by wolves.")
-        if witch_heal:
-            use_heal = input("Do you want to use HEAL potion? (y/n): ")
-            if use_heal == 'y':
-                witch_saved = True
-                witch_heal = False
+            # ใช้ยาช่วย
+            if st.session_state.witch_heal:
+                use_heal = st.checkbox("🧪 ใช้ยาชุบชีวิต (Heal Potion)")
+                if use_heal:
+                    st.session_state.witch_saved = True
+            
+            # ใช้ยาพิษ
+            poison_target = None
+            if st.session_state.witch_poison:
+                use_poison = st.checkbox("☠️ ใช้ยาพิษ (Poison Potion)")
+                if use_poison:
+                    alive_players = [st.session_state.players[i] for i in range(len(st.session_state.players)) if st.session_state.status[i]]
+                    poison_target = st.selectbox("เลือกคนที่ต้องการวางยาพิษ:", alive_players)
+            
+            if st.button("จบขั้นตอนแม่มด"):
+                if st.session_state.witch_saved:
+                    st.session_state.witch_heal = False
+                if poison_target:
+                    st.session_state.witch_kill_target = poison_target
+                    st.session_state.witch_poison = False
                 
-        if witch_poison:
-            use_poison = input("Do you want to use POISON potion? (y/n): ")
-            if use_poison == 'y':
-                poison_choice = int(input("Choose player index to poison: ")) - 1
-                witch_kill_target = players[poison_choice]
-                witch_poison = False
-        play_action_sound()  # เสียงเตือนเมื่อแม่มดเลือกเสร็จ
-    else:
-        print("(Witch is not in game or dead)")
+                play_sound("action")
+                st.session_state.phase = "DAY"
+                st.rerun()
+        else:
+            st.info("(แม่มดเสียชีวิตแล้ว หรือไม่มีในเกม)")
+            if st.button("เข้าสู่ช่วงเช้า"):
+                st.session_state.phase = "DAY"
+                st.rerun()
 
-    # ----------------------------------------------
-    # PROCESS NIGHT DEATHS
-    # ----------------------------------------------
-    dead_tonight = []
-    
-    if target_wolf != protected_player and not witch_saved:
-        for i in range(num_players):
-            if players[i] == target_wolf and player_status[i]:
-                player_status[i] = False
-                dead_tonight.append(players[i])
+    # --------------------------------------------------
+    # 3. ช่วงกลางวัน (DAY PHASE & ALARM)
+    # --------------------------------------------------
+    elif st.session_state.phase == "DAY":
+        play_sound("morning") # 🔥 เปิดเสียงปลุกตอนเช้าผ่านเบราว์เซอร์
+        st.subheader("⏰ ALARM!! ☀️ เช้าวันใหม่ - ทุกคนตื่นนอน!")
+        
+        # ประมวลผลคนตายตอนกลางคืน
+        dead_tonight = []
+        if st.session_state.target_wolf != st.session_state.protected_player and not st.session_state.witch_saved:
+            target_idx = st.session_state.players.index(st.session_state.target_wolf)
+            if st.session_state.status[target_idx]:
+                st.session_state.status[target_idx] = False
+                dead_tonight.append(st.session_state.target_wolf)
+                
+        if st.session_state.witch_kill_target:
+            poison_idx = st.session_state.players.index(st.session_state.witch_kill_target)
+            if st.session_state.status[poison_idx]:
+                st.session_state.status[poison_idx] = False
+                dead_tonight.append(st.session_state.witch_kill_target)
 
-    if witch_kill_target != "":
-        for i in range(num_players):
-            if players[i] == witch_kill_target and player_status[i]:
-                player_status[i] = False
-                dead_tonight.append(players[i])
-
-    # ----------------------------------------------
-    # DAY PHASE (ช่วงกลางวัน)
-    # ----------------------------------------------
-    print("\n==========================================")
-    print("⏰ ALARM! ⏰")
-    play_morning_alarm()  # 🔥 เสียงปลุกตอนเช้าปลุกทุกคนตื่น!
-    print("☀️ DAY PHASE - Everyone wake up!")
-    print("==========================================")
-    
-    if len(dead_tonight) == 0:
-        print("Good news! No one died last night.")
-    else:
-        print("Bad news... Players who died last night:")
-        for d in dead_tonight:
-            print("- " + d)
+        if len(dead_tonight) == 0:
+            st.success("🎉 เป็นโชคดีของหมู่บ้าน! คืนที่ผ่านมาไม่มีใครเสียชีวิต")
+        else:
+            st.error(f"💀 ข่าวร้าย... ผู้เสียชีวิตในคืนนี้ได้แก่: {', '.join(dead_tonight)}")
             
-            if player_roles[players.index(d)] == 'Hunter':
-                print("🏹 HUNTER SKILL ACTIVATED!")
-                hunter_shoot = int(input("Hunter! Choose player index to shoot before dying: ")) - 1
-                player_status[hunter_shoot] = False
-                print(players[hunter_shoot] + " was shot by the Hunter!")
-                play_action_sound()
+            # เช็คสกิล Hunter
+            for d in dead_tonight:
+                d_idx = st.session_state.players.index(d)
+                if st.session_state.roles[d_idx] == 'Hunter':
+                    st.warning(f"🏹 {d} เป็นนายพราน (Hunter) ได้ยิงสวนก่อนตาย!")
 
-    # ----------------------------------------------
-    # WIN CHECK 1
-    # ----------------------------------------------
-    wolves_alive = 0
-    villagers_alive = 0
-    for i in range(num_players):
-        if player_status[i]:
-            if player_roles[i] == 'Werewolf':
-                wolves_alive += 1
-            else:
-                villagers_alive += 1
+        # รีเซ็ตค่ากลางคืน
+        st.session_state.target_wolf = None
+        st.session_state.protected_player = None
+        st.session_state.witch_kill_target = None
+        st.session_state.witch_saved = False
 
-    if wolves_alive == 0:
-        game_over = True
-        winner = "VILLAGERS WIN! All werewolves are dead."
-        break
-    elif wolves_alive >= villagers_alive:
-        game_over = True
-        winner = "WEREWOLVES WIN! They outnumber the villagers."
-        break
+        # เช็คผลการชนะ
+        wolves = sum(1 for i in range(len(st.session_state.players)) if st.session_state.status[i] and st.session_state.roles[i] == 'Werewolf')
+        villagers = sum(1 for i in range(len(st.session_state.players)) if st.session_state.status[i] and st.session_state.roles[i] != 'Werewolf')
 
-    # ----------------------------------------------
-    # VOTING PHASE
-    # ----------------------------------------------
-    print("\n--- VOTING TIME ---")
-    print("Discuss and vote for a suspect.")
-    for i in range(num_players):
-        if player_status[i]:
-            print(str(i+1) + ". " + players[i])
+        if wolves == 0:
+            st.session_state.winner = "🎉 ฝ่ายชาวบ้านชนะ! (Villagers Win)"
+            st.session_state.phase = "GAMEOVER"
+            st.rerun()
+        elif wolves >= villagers:
+            st.session_state.winner = "🐺 ฝ่ายหมาป่าชนะ! (Werewolves Win)"
+            st.session_state.phase = "GAMEOVER"
+            st.rerun()
+
+        if st.button("🗳️ ไปยังช่วงโหวตประหารชีวิต"):
+            st.session_state.phase = "VOTING"
+            st.rerun()
+
+    # --------------------------------------------------
+    # 4. ช่วงโหวตจับหมาป่า (VOTING PHASE)
+    # --------------------------------------------------
+    elif st.session_state.phase == "VOTING":
+        st.subheader("🗳️ ช่วงการพูดคุยและโหวตประหารชีวิต")
+        
+        alive_players = [st.session_state.players[i] for i in range(len(st.session_state.players)) if st.session_state.status[i]]
+        vote_target = st.selectbox("เลือกผู้ต้องสงสัยที่ต้องการประหารชีวิต:", alive_players)
+        
+        if st.button("ยืนยันผลการโหวต"):
+            vote_idx = st.session_state.players.index(vote_target)
+            st.session_state.status[vote_idx] = False
+            play_sound("action")
             
-    voted_choice = int(input("\nEnter player index to ELIMINATE: ")) - 1
-    player_status[voted_choice] = False
-    play_action_sound()
-    
-    print("\n" + players[voted_choice] + " was voted out and executed!")
-    print("Role was: " + player_roles[voted_choice])
-    
-    if player_roles[voted_choice] == 'Hunter':
-        print("🏹 HUNTER SKILL ACTIVATED!")
-        hunter_shoot = int(input("Hunter! Choose player index to shoot before dying: ")) - 1
-        player_status[hunter_shoot] = False
-        print(players[hunter_shoot] + " was shot by the Hunter!")
-        play_action_sound()
+            st.warning(f"⚖️ {vote_target} ถูกโหวตประหารชีวิต! (บทบาทจริงคือ: {st.session_state.roles[vote_idx]})")
+            
+            # เช็คผลชนะหลังโหวต
+            wolves = sum(1 for i in range(len(st.session_state.players)) if st.session_state.status[i] and st.session_state.roles[i] == 'Werewolf')
+            villagers = sum(1 for i in range(len(st.session_state.players)) if st.session_state.status[i] and st.session_state.roles[i] != 'Werewolf')
 
-    # ----------------------------------------------
-    # WIN CHECK 2
-    # ----------------------------------------------
-    wolves_alive = 0
-    villagers_alive = 0
-    for i in range(num_players):
-        if player_status[i]:
-            if player_roles[i] == 'Werewolf':
-                wolves_alive += 1
+            if wolves == 0:
+                st.session_state.winner = "🎉 ฝ่ายชาวบ้านชนะ! (Villagers Win)"
+                st.session_state.phase = "GAMEOVER"
+            elif wolves >= villagers:
+                st.session_state.winner = "🐺 ฝ่ายหมาป่าชนะ! (Werewolves Win)"
+                st.session_state.phase = "GAMEOVER"
             else:
-                villagers_alive += 1
+                st.session_state.phase = "NIGHT_WOLF"
+            
+            time.sleep(3)
+            st.rerun()
 
-    if wolves_alive == 0:
-        game_over = True
-        winner = "VILLAGERS WIN! All werewolves are dead."
-    elif wolves_alive >= villagers_alive:
-        game_over = True
-        winner = "WEREWOLVES WIN! They outnumber the villagers."
-
-# --------------------------------------------------
-# 3. สรุปผลเกม (End Game)
-# --------------------------------------------------
-print("\n==========================================")
-play_gameover_alarm()  # 🔥 เสียงปลุกจบเกม
-print("🎉 GAME OVER 🎉")
-print(winner)
-print("==========================================")
+    # --------------------------------------------------
+    # 5. จบเกม (GAMEOVER PHASE)
+    # --------------------------------------------------
+    elif st.session_state.phase == "GAMEOVER":
+        play_sound("gameover")
+        st.balloons()
+        st.title("🏆 จบเกม! (GAME OVER)")
+        st.header(st.session_state.winner)
+        
+        if st.button("🔄 เล่นใหม่อีกครั้ง"):
+            st.session_state.game_started = False
+            st.rerun()
