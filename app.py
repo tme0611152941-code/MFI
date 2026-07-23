@@ -1,129 +1,255 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Werewolf Master</title>
-    <style>
-        body { font-family: 'Sukhumvit Set', 'Kanit', sans-serif; background-color: #0b0f19; color: white; text-align: center; padding: 20px; }
-        .card { background-color: #1e293b; padding: 20px; border-radius: 15px; border: 2px solid #3b82f6; max-width: 500px; margin: 0 auto 20px; }
-        button { background-color: #2563eb; color: white; border: none; padding: 15px 25px; font-size: 18px; font-weight: bold; border-radius: 10px; cursor: pointer; width: 100%; margin-top: 10px; }
-        button:hover { background-color: #1d4ed8; }
-        select, textarea { width: 90%; padding: 10px; font-size: 16px; border-radius: 8px; margin-bottom: 10px; }
-        .night { background-color: #111827; border-color: #4f46e5; }
-        .alert { color: #f59e0b; font-size: 24px; font-weight: bold; }
-    </style>
-</head>
-<body>
+import random
+import time
+import winsound  # ไลบรารีสำหรับทำเสียงเตือนปลุกบน Windows / Python
 
-    <h1>🤖 AI Werewolf Master</h1>
-    <p>ระบบคุมเกมอัตโนมัติ (เวอร์ชัน HTML สำหรับ iPad เสียงชัวร์ 100%)</p>
+# --------------------------------------------------
+# ฟังก์ชันทำเสียงปลุก (Alarm Sounds)
+# --------------------------------------------------
+def play_morning_alarm():
+    # เสียงปลุกตอนเช้า (ดังสลับความถี่แบบนาฬิกาปลุก iOS)
+    for _ in range(3):
+        winsound.Beep(1000, 150)  # ความถี่ 1000Hz ยาว 0.15 วิ
+        winsound.Beep(1500, 150)  # ความถี่ 1500Hz ยาว 0.15 วิ
+        time.sleep(0.1)
 
-    <!-- Phase 1: Setup -->
-    <div id="setup-phase" class="card">
-        <h2>⚙️ ตั้งค่าผู้เล่น</h2>
-        <textarea id="player-names" rows="6">แต้ม&#10;บอม&#10;นนท์&#10;ตั๊ก&#10;เอ็ม&#10;เกรท</textarea><br>
-        <button onclick="startGame()">🎲 เริ่มสุ่มบทบาท</button>
-    </div>
+def play_action_sound():
+    # เสียงเตือนเมื่อทำภารกิจ/โหวตเสร็จ
+    winsound.Beep(800, 200)
 
-    <!-- Phase 2: Action Phase -->
-    <div id="game-phase" class="card night" style="display:none;">
-        <h2 id="phase-title">🌙 กลางคืน</h2>
-        <div id="phase-content"></div>
-        <button id="action-btn" onclick="nextStep()">🔔 ยืนยัน</button>
-    </div>
+def play_gameover_alarm():
+    # เสียงปลุกรัวๆ เมื่อจบเกม
+    for i in range(4):
+        winsound.Beep(1200 - (i * 200), 200)
 
-    <script>
-        let players = [];
-        let roles = {};
-        let currentStep = 0;
-        let nightKills = "";
+# --------------------------------------------------
+# 1. ตั้งค่าผู้เล่นและสุ่มบทบาท (Roles Setup)
+# --------------------------------------------------
+print("=== WELCOME TO WEREWOLF GAME ===")
+num_players = int(input("Enter number of players (6-10): "))
 
-        // เสียงไก่ขัน MP3 ชัดเจน
-        const roosterAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+players = []
+for i in range(1, num_players + 1):
+    players.append("Player_" + str(i))
 
-        // ฟังก์ชันพูดภาษาไทย
-        function speak(text, delay = 0) {
-            setTimeout(() => {
-                window.speechSynthesis.cancel();
-                let msg = new SpeechSynthesisUtterance(text);
-                msg.lang = 'th-TH';
-                msg.rate = 0.85;
-                window.speechSynthesis.speak(msg);
-            }, delay);
-        }
+roles_pool = ['Werewolf', 'Seer', 'Bodyguard', 'Witch', 'Hunter']
 
-        function startGame() {
-            let input = document.getElementById("player-names").value.trim();
-            players = input.split('\n').map(p => p.trim()).filter(p => p);
-            if(players.length < 4) { alert("กรุณาใส่ชื่อผู้เล่นอย่างน้อย 4 คน"); return; }
+if num_players >= 8:
+    roles_pool.append('Werewolf')
 
-            // สุ่มบทบาท
-            let deck = ["🐺 หมาป่า", "🔮 ผู้หยั่งรู้", "🛡️ หมอ"];
-            while(deck.length < players.length) deck.push("🏡 ชาวบ้าน");
-            deck = deck.sort(() => Math.random() - 0.5);
+while len(roles_pool) < num_players:
+    roles_pool.append('Villager')
 
-            players.forEach((p, i) => roles[p] = deck[i]);
+random.shuffle(roles_pool)
 
-            document.getElementById("setup-phase").style.display = "none";
-            document.getElementById("game-phase").style.display = "block";
+player_roles = list(roles_pool)
+player_status = [] 
+for p in players:
+    player_status.append(True)
+
+witch_heal = True
+witch_poison = True
+
+print("\n--- ASSIGNING ROLES ---")
+for i in range(num_players):
+    print(players[i] + " is " + player_roles[i])
+    
+print("\nGame start in 3 seconds...")
+time.sleep(3)
+
+# --------------------------------------------------
+# 2. เริ่มลูปเกม (Game Loop)
+# --------------------------------------------------
+game_over = False
+winner = ""
+
+while not game_over:
+    
+    # ----------------------------------------------
+    # NIGHT PHASE (ช่วงกลางคืน)
+    # ----------------------------------------------
+    print("\n==========================================")
+    print("🌙 NIGHT PHASE - Everyone close your eyes...")
+    print("==========================================")
+    
+    target_wolf = ""
+    protected_player = ""
+    witch_kill_target = ""
+    witch_saved = False
+    
+    # --- 1. WEREWOLF TURN ---
+    print("\n[🐺 Werewolf Turn]")
+    for i in range(num_players):
+        if player_status[i]:
+            print(str(i+1) + ". " + players[i])
             
-            startNight();
-        }
+    wolf_choice = int(input("Werewolf! Choose player index to kill: ")) - 1
+    target_wolf = players[wolf_choice]
+    play_action_sound()  # เสียงเตือนเมื่อหมาป่าทำภารกิจเสร็จ
+    
+    # --- 2. SEER TURN ---
+    print("\n[🔮 Seer Turn]")
+    seer_alive = False
+    for i in range(num_players):
+        if player_roles[i] == 'Seer' and player_status[i]:
+            seer_alive = True
+            
+    if seer_alive:
+        seer_choice = int(input("Seer! Choose player index to check: ")) - 1
+        if player_roles[seer_choice] == 'Werewolf':
+            print(">>> Result: This player is a WEREWOLF! 🐺")
+        else:
+            print(">>> Result: This player is NOT a werewolf. 🧑")
+        play_action_sound()  # เสียงเตือนเมื่อหมอดูส่องเสร็จ
+    else:
+        print("(Seer is not in game or dead)")
 
-        function startNight() {
-            currentStep = 1;
-            showWolfStep();
-        }
+    # --- 3. BODYGUARD TURN ---
+    print("\n[🛡️ Bodyguard Turn]")
+    guard_alive = False
+    for i in range(num_players):
+        if player_roles[i] == 'Bodyguard' and player_status[i]:
+            guard_alive = True
+            
+    if guard_alive:
+        guard_choice = int(input("Bodyguard! Choose player index to protect: ")) - 1
+        protected_player = players[guard_choice]
+        play_action_sound()  # เสียงเตือนเมื่อบอดี้การ์ดเลือกเสร็จ
+    else:
+        print("(Bodyguard is not in game or dead)")
 
-        function showWolfStep() {
-            document.getElementById("phase-title").innerText = "🐺 ช่วงเวลาของมนุษย์หมาป่า";
-            let options = players.map(p => `<option value="${p}">${p}</option>`).join('');
-            document.getElementById("phase-content").innerHTML = `
-                <p>เลือกคนที่หมาป่าต้องการฆ่า:</p>
-                <select id="kill-target">${options}</select>
-            `;
-            document.getElementById("action-btn").onclick = () => {
-                nightKills = document.getElementById("kill-target").value;
-                document.getElementById("phase-content").innerHTML = "<p class='alert'>⏳ บันทึกข้อมูลเรียบร้อย...</p>";
-                // หน่วง 2 วินาที แล้วพูดเสียงคน
-                speak("ทำภารกิจเสร็จแล้ว ส่งเครื่องคืนกลางวง แล้วหลับตาลงได้ค่ะ", 2000);
-                setTimeout(showDoctorStep, 4000);
-            };
-        }
+    # --- 4. WITCH TURN ---
+    print("\n[🧙‍♀️ Witch Turn]")
+    witch_alive = False
+    for i in range(num_players):
+        if player_roles[i] == 'Witch' and player_status[i]:
+            witch_alive = True
+            
+    if witch_alive:
+        print("Tonight, " + target_wolf + " was targeted by wolves.")
+        if witch_heal:
+            use_heal = input("Do you want to use HEAL potion? (y/n): ")
+            if use_heal == 'y':
+                witch_saved = True
+                witch_heal = False
+                
+        if witch_poison:
+            use_poison = input("Do you want to use POISON potion? (y/n): ")
+            if use_poison == 'y':
+                poison_choice = int(input("Choose player index to poison: ")) - 1
+                witch_kill_target = players[poison_choice]
+                witch_poison = False
+        play_action_sound()  # เสียงเตือนเมื่อแม่มดเลือกเสร็จ
+    else:
+        print("(Witch is not in game or dead)")
 
-        function showDoctorStep() {
-            document.getElementById("phase-title").innerText = "🛡️ ช่วงเวลาของหมอ";
-            let options = players.map(p => `<option value="${p}">${p}</option>`).join('');
-            document.getElementById("phase-content").innerHTML = `
-                <p>เลือกคนที่หมอต้องการคุ้มกัน:</p>
-                <select id="heal-target">${options}</select>
-            `;
-            document.getElementById("action-btn").onclick = () => {
-                let healTarget = document.getElementById("heal-target").value;
-                if(healTarget === nightKills) nightKills = ""; // ช่วยทัน
-                document.getElementById("phase-content").innerHTML = "<p class='alert'>⏳ บันทึกข้อมูลเรียบร้อย...</p>";
-                speak("ทำภารกิจเสร็จแล้ว ส่งเครื่องคืนกลางวง แล้วหลับตาลงได้ค่ะ", 2000);
-                setTimeout(showMorningStep, 4000);
-            };
-        }
+    # ----------------------------------------------
+    # PROCESS NIGHT DEATHS
+    # ----------------------------------------------
+    dead_tonight = []
+    
+    if target_wolf != protected_player and not witch_saved:
+        for i in range(num_players):
+            if players[i] == target_wolf and player_status[i]:
+                player_status[i] = False
+                dead_tonight.append(players[i])
 
-        function showMorningStep() {
-            document.getElementById("phase-title").innerText = "🐓 เช้าวันใหม่";
-            document.getElementById("phase-content").innerHTML = "<p class='alert'>🔔 กำลังส่งเสียงไก่ขันปลุกทุกคน...</p>";
-            document.getElementById("action-btn").style.display = "none";
+    if witch_kill_target != "":
+        for i in range(num_players):
+            if players[i] == witch_kill_target and player_status[i]:
+                player_status[i] = False
+                dead_tonight.append(players[i])
 
-            // เล่นเสียงไก่ขันทันที
-            roosterAudio.play();
+    # ----------------------------------------------
+    # DAY PHASE (ช่วงกลางวัน)
+    # ----------------------------------------------
+    print("\n==========================================")
+    print("⏰ ALARM! ⏰")
+    play_morning_alarm()  # 🔥 เสียงปลุกตอนเช้าปลุกทุกคนตื่น!
+    print("☀️ DAY PHASE - Everyone wake up!")
+    print("==========================================")
+    
+    if len(dead_tonight) == 0:
+        print("Good news! No one died last night.")
+    else:
+        print("Bad news... Players who died last night:")
+        for d in dead_tonight:
+            print("- " + d)
+            
+            if player_roles[players.index(d)] == 'Hunter':
+                print("🏹 HUNTER SKILL ACTIVATED!")
+                hunter_shoot = int(input("Hunter! Choose player index to shoot before dying: ")) - 1
+                player_status[hunter_shoot] = False
+                print(players[hunter_shoot] + " was shot by the Hunter!")
+                play_action_sound()
 
-            // AI พูดปลุกหลังไก่ขันจบ
-            speak("อรุณสวัสดิ์ค่ะทุกคน ลืมตาขึ้นมาได้แล้วค่ะ", 2500);
+    # ----------------------------------------------
+    # WIN CHECK 1
+    # ----------------------------------------------
+    wolves_alive = 0
+    villagers_alive = 0
+    for i in range(num_players):
+        if player_status[i]:
+            if player_roles[i] == 'Werewolf':
+                wolves_alive += 1
+            else:
+                villagers_alive += 1
 
-            setTimeout(() => {
-                let resultText = nightKills ? `💀 เมื่อคืนนี้... ${nightKills} โดนหมาป่าสังหาร!` : "🕊️ คืนที่ผ่านมาเงียบสงบ ไม่มีใครเสียชีวิต!";
-                document.getElementById("phase-content").innerHTML = `<h2>${resultText}</h2>`;
-            }, 5000);
-        }
-    </script>
-</body>
-</html>
+    if wolves_alive == 0:
+        game_over = True
+        winner = "VILLAGERS WIN! All werewolves are dead."
+        break
+    elif wolves_alive >= villagers_alive:
+        game_over = True
+        winner = "WEREWOLVES WIN! They outnumber the villagers."
+        break
+
+    # ----------------------------------------------
+    # VOTING PHASE
+    # ----------------------------------------------
+    print("\n--- VOTING TIME ---")
+    print("Discuss and vote for a suspect.")
+    for i in range(num_players):
+        if player_status[i]:
+            print(str(i+1) + ". " + players[i])
+            
+    voted_choice = int(input("\nEnter player index to ELIMINATE: ")) - 1
+    player_status[voted_choice] = False
+    play_action_sound()
+    
+    print("\n" + players[voted_choice] + " was voted out and executed!")
+    print("Role was: " + player_roles[voted_choice])
+    
+    if player_roles[voted_choice] == 'Hunter':
+        print("🏹 HUNTER SKILL ACTIVATED!")
+        hunter_shoot = int(input("Hunter! Choose player index to shoot before dying: ")) - 1
+        player_status[hunter_shoot] = False
+        print(players[hunter_shoot] + " was shot by the Hunter!")
+        play_action_sound()
+
+    # ----------------------------------------------
+    # WIN CHECK 2
+    # ----------------------------------------------
+    wolves_alive = 0
+    villagers_alive = 0
+    for i in range(num_players):
+        if player_status[i]:
+            if player_roles[i] == 'Werewolf':
+                wolves_alive += 1
+            else:
+                villagers_alive += 1
+
+    if wolves_alive == 0:
+        game_over = True
+        winner = "VILLAGERS WIN! All werewolves are dead."
+    elif wolves_alive >= villagers_alive:
+        game_over = True
+        winner = "WEREWOLVES WIN! They outnumber the villagers."
+
+# --------------------------------------------------
+# 3. สรุปผลเกม (End Game)
+# --------------------------------------------------
+print("\n==========================================")
+play_gameover_alarm()  # 🔥 เสียงปลุกจบเกม
+print("🎉 GAME OVER 🎉")
+print(winner)
+print("==========================================")
