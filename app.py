@@ -5,13 +5,13 @@ import time
 # --------------------------------------------------
 # ตั้งค่าหน้าเว็บ
 # --------------------------------------------------
-st.set_page_config(page_title="Werewolf Game for Friends", page_icon="🐺", layout="centered")
+st.set_page_config(page_title="Ultimate Werewolf", page_icon="🐺", layout="centered")
 
-st.title("🐺 Werewolf Game (ระบบจัดการสำหรับเล่นกับเพื่อน)")
-st.write("ตั้งค่าบทบาท สุ่มแจก และรันเกมผ่านเว็บได้เลย!")
+st.title("🐺 Ultimate Werewolf Game")
+st.write("ระบบจัดการเกมหมาป่า: กรอกชื่อเพื่อน + สุ่มบทบาทครบชุด!")
 
 # --------------------------------------------------
-# ฟังก์ชันเล่นเสียงเตือนผ่านเบราว์เซอร์ (iOS / PC / Android)
+# ฟังก์ชันเล่นเสียงเตือนผ่านเบราว์เซอร์
 # --------------------------------------------------
 def play_sound(sound_type):
     if sound_type == "morning":
@@ -35,62 +35,88 @@ def play_sound(sound_type):
 # --------------------------------------------------
 if 'game_started' not in st.session_state:
     st.session_state.game_started = False
-    st.session_state.phase = "SETUP" # SETUP, CHECK_ROLES, NIGHT_WOLF, NIGHT_SEER, NIGHT_GUARD, NIGHT_WITCH, DAY, VOTING, GAMEOVER
+    st.session_state.phase = "SETUP"
     st.session_state.players = []
     st.session_state.roles = []
     st.session_state.status = []
+    st.session_state.lovers = [] # คู่รักจาก Cupid
     st.session_state.witch_heal = True
     st.session_state.witch_poison = True
     st.session_state.target_wolf = None
     st.session_state.protected_player = None
     st.session_state.witch_kill_target = None
     st.session_state.witch_saved = False
+    st.session_state.winner = ""
 
 # ==================================================
-# 1. หน้าตั้งค่าบทบาทและจำนวนผู้เล่น (SETUP PHASE)
+# 1. หน้าตั้งชื่อผู้เล่นและเลือกบทบาท (SETUP)
 # ==================================================
 if st.session_state.phase == "SETUP":
-    st.subheader("⚙️ 1. เลือกจำนวนคนและตั้งค่าบทบาท")
+    st.subheader("📝 1. กรอกชื่อผู้เล่น")
     
-    num_players = st.number_input("จำนวนผู้เล่นทั้งหมด (คน):", min_value=4, max_value=15, value=6)
+    num_players = st.number_input("จำนวนผู้เล่นทั้งหมด (คน):", min_value=4, max_value=20, value=6)
     
     st.write("---")
-    st.write("🎯 **เลือกบทบาทพิเศษที่จะให้มีในเกม:**")
+    st.write("👤 **ใส่ชื่อเพื่อนแต่ละคน:**")
     
-    num_wolves = st.slider("จำนวนหมาป่า (Werewolves):", min_value=1, max_value=3, value=1 if num_players < 8 else 2)
-    has_seer = st.checkbox("🔮 หมอดู (Seer - ส่องดูหมาป่า)", value=True)
-    has_guard = st.checkbox("🛡️ บอดี้การ์ด (Bodyguard - ปกป้องคน)", value=True)
-    has_witch = st.checkbox("🧙‍♀️ แม่มด (Witch - ยาช่วย / ยาพิษ)", value=True)
-    has_hunter = st.checkbox("🏹 นายพราน (Hunter - ยิงสวนก่อนตาย)", value=True)
+    player_names = []
+    cols = st.columns(2)
+    for i in range(num_players):
+        col = cols[i % 2]
+        default_name = f"เพื่อน_{i+1}"
+        name = col.text_input(f"คนที่ {i+1}:", value=default_name, key=f"p_{i}")
+        player_names.append(name.strip())
+
+    st.write("---")
+    st.subheader("🎭 2. เลือกบทบาทที่จะให้มีในเกม")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        num_wolves = st.slider("🐺 จำนวนหมาป่า:", 1, 4, 1 if num_players < 8 else 2)
+        has_seer = st.checkbox("🔮 หมอดู (Seer)", value=True)
+        has_guard = st.checkbox("🛡️ บอดี้การ์ด (Bodyguard)", value=True)
+        has_witch = st.checkbox("🧙‍♀️ แม่มด (Witch)", value=True)
+    
+    with col2:
+        has_hunter = st.checkbox("🏹 นายพราน (Hunter)", value=True)
+        has_cupid = st.checkbox("💘 คิวปิด (Cupid)", value=num_players >= 7)
+        has_fool = st.checkbox("🤡 ตัวตลก (Fool / Jester)", value=num_players >= 7)
+        has_girl = st.checkbox("👶 เด็กน้อย (Little Girl)", value=False)
 
     # คำนวณจำนวนบทบาทพิเศษ
-    special_roles_count = num_wolves
-    if has_seer: special_roles_count += 1
-    if has_guard: special_roles_count += 1
-    if has_witch: special_roles_count += 1
-    if has_hunter: special_roles_count += 1
+    special_count = num_wolves
+    if has_seer: special_count += 1
+    if has_guard: special_count += 1
+    if has_witch: special_count += 1
+    if has_hunter: special_count += 1
+    if has_cupid: special_count += 1
+    if has_fool: special_count += 1
+    if has_girl: special_count += 1
 
-    villagers_count = num_players - special_roles_count
+    villagers_count = num_players - special_count
 
     if villagers_count < 0:
-        st.error(f"❌ เลือกบทบาทพิเศษเกินจำนวนคน! (คนเล่น {num_players} คน แต่เลือกบทบาทไป {special_roles_count} บท)")
+        st.error(f"❌ บทบาทที่เลือกเกินจำนวนคนเล่น! (ผู้เล่น {num_players} คน แต่เลือกไป {special_count} บทบาท)")
     else:
-        st.info(f"💡 สรุปบทบาท: หมาป่า {num_wolves} คน | บทบาทพิเศษ {special_roles_count - num_wolves} คน | ชาวบ้านธรรมดา {villagers_count} คน")
+        st.info(f"💡 สรุป: หมาป่า {num_wolves} คน | บทพิเศษ {special_count - num_wolves} คน | ชาวบ้าน {villagers_count} คน")
         
-        if st.button("🎲 สุ่มบทบาทและเริ่มเกม (Start Game)"):
-            # สร้าง List บทบาททั้งหมด
+        if st.button("🎲 สุ่มแจกบทบาทและเริ่มเกม!"):
+            # สร้าง List รวมบทบาททั้งหมด
             roles_pool = ['Werewolf'] * num_wolves
             if has_seer: roles_pool.append('Seer')
             if has_guard: roles_pool.append('Bodyguard')
             if has_witch: roles_pool.append('Witch')
             if has_hunter: roles_pool.append('Hunter')
+            if has_cupid: roles_pool.append('Cupid')
+            if has_fool: roles_pool.append('Fool')
+            if has_girl: roles_pool.append('Little Girl')
             roles_pool.extend(['Villager'] * villagers_count)
 
-            # สุ่มลำดับบทบาท
+            # สุ่มบทบาท
             random.shuffle(roles_pool)
 
-            # บันทึกลงระบบ
-            st.session_state.players = [f"Player_{i+1}" for i in range(num_players)]
+            # บันทึกข้อมูล
+            st.session_state.players = player_names
             st.session_state.roles = roles_pool
             st.session_state.status = [True] * num_players
             st.session_state.game_started = True
@@ -98,49 +124,73 @@ if st.session_state.phase == "SETUP":
             st.rerun()
 
 # ==================================================
-# 2. หน้าแอบดูบทบาทตัวเองทีละคน (CHECK ROLES PHASE)
+# 2. หน้าวนกันแอบดูบทบาทตัวเอง (CHECK ROLES)
 # ==================================================
 elif st.session_state.phase == "CHECK_ROLES":
-    st.subheader("🔍 2. แจกจ่ายบทบาท (วนเปิดทีละคน)")
-    st.warning("⚠️ ส่งเครื่องให้อ่านทีละคน และห้ามให้เพื่อนข้างๆ แอบดูหน้าจอ!")
+    st.subheader("🔍 แอบดูบทบาทตัวเอง (วนเปิดทีละคน)")
+    st.warning("⚠️ แนะนำให้ยื่นหน้าจอให้เพื่อนเปิดดูทีละคน แล้วกดซ่อนก่อนส่งต่อ!")
 
-    selected_player = st.selectbox("เลือกชื่อของคุณเพื่อดูบทบาท:", st.session_state.players)
+    selected_player = st.selectbox("เลือกชื่อของคุณ:", st.session_state.players)
     idx = st.session_state.players.index(selected_player)
 
-    with st.expander(f"👉 คลิกที่นี่เพื่อเปิดดูบทบาทของ {selected_player}"):
+    with st.expander(f"👉 คลิกที่นี่เพื่อเปิดดูบทบาทของคุณ ({selected_player})"):
         role = st.session_state.roles[idx]
-        if role == 'Werewolf':
-            st.error("🐺 คุณได้บทบาท: WEREWOLF (หมาป่า)\n\nภารกิจ: ลอบฆ่าชาวบ้านในตอนกลางคืน!")
-        elif role == 'Seer':
-            st.info("🔮 คุณได้บทบาท: SEER (หมอดู)\n\nภารกิจ: ส่องดูผู้เล่นในตอนกลางคืนว่าเป็นหมาป่าหรือไม่")
-        elif role == 'Bodyguard':
-            st.success("🛡️ คุณได้บทบาท: BODYGUARD (บอดี้การ์ด)\n\nภารกิจ: ปกป้องผู้เล่น 1 คนในทุกๆ คืน")
-        elif role == 'Witch':
-            st.warning("🧙‍♀️ คุณได้บทบาท: WITCH (แม่มด)\n\nภารกิจ: มียาช่วย 1 ขวด และยาพิษ 1 ขวด")
-        elif role == 'Hunter':
-            st.warning("🏹 คุณได้บทบาท: HUNTER (นายพราน)\n\nภารกิจ: ถ้าคุณตาย คุณสามารถลากคนอื่นตายตามได้ 1 คน")
-        else:
-            st.write("🧑 คุณได้บทบาท: VILLAGER (ชาวบ้านธรรมดา)\n\nภารกิจ: ช่วยกันพูดคุยและโหวตจับหมาป่าในตอนกลางวัน!")
+        
+        role_descriptions = {
+            'Werewolf': ("🐺 WEREWOLF (หมาป่า)", "ตื่นมาตอนกลางคืนเพื่อเลือกฆ่าชาวบ้าน!"),
+            'Seer': ("🔮 SEER (หมอดู)", "ตื่นมาส่องดูผู้เล่นอื่นในตอนกลางคืนว่าเป็นหมาป่าหรือไม่"),
+            'Bodyguard': ("🛡️ BODYGUARD (บอดี้การ์ด)", "เลือกปกป้องผู้เล่น 1 คนในตอนกลางคืนไม่ให้โดนหมาป่ากัด"),
+            'Witch': ("🧙‍♀️ WITCH (แม่มด)", "มียาชุบชีวิต 1 ขวด และยาพิษ 1 ขวด ใช้ได้ขวดละครั้ง"),
+            'Hunter': ("🏹 HUNTER (นายพราน)", "ถ้าคุณตาย คุณสามารถยิงสังหารคนอื่นตายตามได้ 1 คน"),
+            'Cupid': ("💘 CUPID (คิวปิด)", "ผูกดวงคู่รัก 2 คนในคืนแรก ถ้าคนหนึ่งตาย อีกคนจะตายตามทันที!"),
+            'Fool': ("🤡 FOOL / JESTER (ตัวตลก)", "เงื่อนไขชนะพิเศษ: ต้องปั่นให้คนอื่นโหวตประหารชีวิตคุณ!"),
+            'Little Girl': ("👶 LITTLE GIRL (เด็กน้อย)", "แอบลืมตาดูหมาป่าได้ แต่ถ้าหมาป่าจับได้จะตายทันที"),
+            'Villager': ("🧑 VILLAGER (ชาวบ้าน)", "ไม่มีพลังพิเศษ ใช้การสังเกตและโหวตจับหมาป่าในตอนกลางวัน")
+        }
+        
+        title, desc = role_descriptions.get(role, ("🧑 VILLAGER", "ชาวบ้านธรรมดา"))
+        st.markdown(f"### **{title}**")
+        st.write(f"**ภารกิจ:** {desc}")
 
     st.write("---")
-    if st.button("🌙 เมื่อทุกคนดูบทบาทครบแล้ว -> เริ่มช่วงกลางคืนแรก"):
-        st.session_state.phase = "NIGHT_WOLF"
+    if st.button("🌙 เมื่อทุกคนดูบทบาทครบแล้ว -> เริ่มกลางคืนแรก"):
+        # ถ้ามี Cupid ให้เข้าเฟส Cupid ก่อน
+        if 'Cupid' in st.session_state.roles:
+            st.session_state.phase = "NIGHT_CUPID"
+        else:
+            st.session_state.phase = "NIGHT_WOLF"
         st.rerun()
 
 # ==================================================
 # 3. ช่วงกลางคืน (NIGHT PHASES)
 # ==================================================
 else:
-    # เมนูซ่อน/เปิด ดูบทบาททั้งหมดสำหรับผู้ดำเนินเกม (Moderator)
-    with st.expander("👁️ เฉลยบทบาททั้งหมด (สำหรับคนคุมเกมดูเท่านั้น)"):
+    # เมนูเฉลยสำหรับคนคุมเกม
+    with st.expander("👁️ เฉลยบทบาททั้งหมด (สำหรับคนคุมเกมดู)"):
         for i in range(len(st.session_state.players)):
-            status_text = "🟢 รอด" if st.session_state.status[i] else "💀 ตายแล้ว"
-            st.write(f"**{st.session_state.players[i]}**: {st.session_state.roles[i]} ({status_text})")
+            st_text = "🟢 รอด" if st.session_state.status[i] else "💀 ตายแล้ว"
+            st.write(f"**{st.session_state.players[i]}**: {st.session_state.roles[i]} ({st_text})")
+        if st.session_state.lovers:
+            st.write(f"💘 **คู่รัก:** {st.session_state.lovers[0]} ❤️ {st.session_state.lovers[1]}")
 
     st.divider()
 
+    # --- 💘 คิวปิดจับคู่รัก (คืนแรกคืนเดียว) ---
+    if st.session_state.phase == "NIGHT_CUPID":
+        st.subheader("🌙 กลางคืน: [💘 คิวปิด ตื่นขึ้นมา]")
+        st.write("เลือกผู้เล่น 2 คนให้กลายเป็นคู่รักกัน:")
+        
+        lover1 = st.selectbox("คู่รักคนที่ 1:", st.session_state.players, index=0)
+        lover2 = st.selectbox("คู่รักคนที่ 2:", st.session_state.players, index=1)
+        
+        if st.button("ผูกดวงคู่รัก"):
+            st.session_state.lovers = [lover1, lover2]
+            play_sound("action")
+            st.session_state.phase = "NIGHT_WOLF"
+            st.rerun()
+
     # --- 🐺 หมาป่าเลือกเหยื่อ ---
-    if st.session_state.phase == "NIGHT_WOLF":
+    elif st.session_state.phase == "NIGHT_WOLF":
         st.subheader("🌙 กลางคืน: [🐺 หมาป่า ตื่นขึ้นมา]")
         st.write("เลือกคนที่หมาป่าต้องการสังหารคืนนี้:")
         
@@ -161,8 +211,8 @@ else:
         if seer_alive:
             check_target = st.selectbox("เลือกผู้เล่นที่ต้องการตรวจสอบ:", st.session_state.players, key="seer_choice")
             if st.button("ตรวจสอบบทบาท"):
-                target_index = st.session_state.players.index(check_target)
-                if st.session_state.roles[target_index] == 'Werewolf':
+                t_idx = st.session_state.players.index(check_target)
+                if st.session_state.roles[t_idx] == 'Werewolf':
                     st.error(f"🔍 ผลการตรวจ: **{check_target}** เป็น 🐺 WEREWOLF!")
                 else:
                     st.success(f"🔍 ผลการตรวจ: **{check_target}** เป็น 🧑 คนธรรมดา")
@@ -172,7 +222,7 @@ else:
                 st.rerun()
         else:
             st.info("(หมอดูเสียชีวิตแล้ว หรือไม่มีในเกม)")
-            if st.button("ข้ามไปยังบทบาทถัดไป"):
+            if st.button("ข้ามไปบทบาทถัดไป"):
                 st.session_state.phase = "NIGHT_GUARD" if 'Bodyguard' in st.session_state.roles else "NIGHT_WITCH"
                 st.rerun()
 
@@ -191,7 +241,7 @@ else:
                 st.rerun()
         else:
             st.info("(บอดี้การ์ดเสียชีวิตแล้ว หรือไม่มีในเกม)")
-            if st.button("ข้ามไปยังบทบาทถัดไป"):
+            if st.button("ข้ามไปบทบาทถัดไป"):
                 st.session_state.phase = "NIGHT_WITCH" if 'Witch' in st.session_state.roles else "DAY"
                 st.rerun()
 
@@ -235,7 +285,7 @@ else:
     # 4. ช่วงกลางวัน (DAY PHASE & ALARM)
     # ==================================================
     elif st.session_state.phase == "DAY":
-        play_sound("morning") # 🔥 เสียงปลุกตอนเช้าดังผ่านเบราว์เซอร์
+        play_sound("morning") # 🔥 เสียงปลุกตอนเช้า
         st.subheader("⏰ ALARM!! ☀️ เช้าวันใหม่ - ทุกคนตื่นนอน!")
         
         dead_tonight = []
@@ -251,15 +301,23 @@ else:
                 st.session_state.status[poison_idx] = False
                 dead_tonight.append(st.session_state.witch_kill_target)
 
+        # เช็คการตายของคู่รัก (Cupid Link)
+        if st.session_state.lovers:
+            l1, l2 = st.session_state.lovers
+            l1_dead = not st.session_state.status[st.session_state.players.index(l1)]
+            l2_dead = not st.session_state.status[st.session_state.players.index(l2)]
+            
+            if l1_dead and not l2_dead:
+                st.session_state.status[st.session_state.players.index(l2)] = False
+                dead_tonight.append(f"{l2} (ตรอมใจตายตามคู่รัก {l1})")
+            elif l2_dead and not l1_dead:
+                st.session_state.status[st.session_state.players.index(l1)] = False
+                dead_tonight.append(f"{l1} (ตรอมใจตายตามคู่รัก {l2})")
+
         if len(dead_tonight) == 0:
             st.success("🎉 เป็นโชคดีของหมู่บ้าน! คืนที่ผ่านมาไม่มีใครเสียชีวิต")
         else:
-            st.error(f"💀 ข่าวร้าย... ผู้เสียชีวิตในคืนนี้ได้แก่: {', '.join(dead_tonight)}")
-            
-            for d in dead_tonight:
-                d_idx = st.session_state.players.index(d)
-                if st.session_state.roles[d_idx] == 'Hunter':
-                    st.warning(f"🏹 {d} เป็นนายพราน (Hunter) ได้ยิงสวนก่อนตาย!")
+            st.error(f"💀 ข่าวร้าย... ผู้เสียชีวิตได้แก่: {', '.join(dead_tonight)}")
 
         # รีเซ็ตค่ากลางคืน
         st.session_state.target_wolf = None
@@ -288,7 +346,7 @@ else:
     # 5. ช่วงโหวตจับหมาป่า (VOTING PHASE)
     # ==================================================
     elif st.session_state.phase == "VOTING":
-        st.subheader("🗳️ ช่วงพูดคุยจับผิด และโหวตประหารชีวิต")
+        st.subheader("🗳️ ช่วงพูดคุยและโหวตประหารชีวิต")
         
         alive_players = [st.session_state.players[i] for i in range(len(st.session_state.players)) if st.session_state.status[i]]
         vote_target = st.selectbox("เลือกคนที่ถูกเสียงส่วนใหญ่โหวตออก:", alive_players)
@@ -298,8 +356,15 @@ else:
             st.session_state.status[vote_idx] = False
             play_sound("action")
             
-            st.warning(f"⚖️ {vote_target} ถูกโหวตประหารชีวิต! (บทบาทจริงคือ: {st.session_state.roles[vote_idx]})")
+            role_voted = st.session_state.roles[vote_idx]
+            st.warning(f"⚖️ {vote_target} ถูกโหวตประหารชีวิต! (บทบาทจริงคือ: {role_voted})")
             
+            # เช็คเงื่อนไขชนะของ Fool (ตัวตลก)
+            if role_voted == 'Fool':
+                st.session_state.winner = f"🤡 {vote_target} (ตัวตลก) ชนะเกม! เพราะปั่นจนโดนโหวตประหารสำเร็จ!"
+                st.session_state.phase = "GAMEOVER"
+                st.rerun()
+
             wolves = sum(1 for i in range(len(st.session_state.players)) if st.session_state.status[i] and st.session_state.roles[i] == 'Werewolf')
             villagers = sum(1 for i in range(len(st.session_state.players)) if st.session_state.status[i] and st.session_state.roles[i] != 'Werewolf')
 
