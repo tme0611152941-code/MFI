@@ -2,428 +2,234 @@ import streamlit as st
 import random
 import time
 
-# ==================================================
-# 1. ตั้งค่าหน้าเว็บ & Theme
-# ==================================================
+# --------------------------------------------------
+# 1. ตั้งค่าหน้าเว็บ
+# --------------------------------------------------
 st.set_page_config(
-    page_title="Ultimate Werewolf - PIN Edition",
-    page_icon="🐺",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    page_title="Extruder Overload: Polymer Master Edition",
+    page_icon="🔬",
+    layout="centered"
 )
 
-def apply_theme(phase):
-    if "NIGHT" in phase or phase == "NIGHT_INPUT":
-        st.markdown(
-            """
-            <style>
-            .stApp { background: linear-gradient(180deg, #090A0F 0%, #171B26 100%); color: #E2E8F0; }
-            .stButton>button { background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: white; border: none; border-radius: 12px; padding: 12px 24px; font-weight: bold; }
-            .role-card { background: rgba(30, 41, 59, 0.7); border: 2px solid #6366F1; border-radius: 16px; padding: 20px; text-align: center; }
-            </style>
-            """, unsafe_allow_html=True
-        )
-    elif phase == "DAY":
-        st.markdown(
-            """
-            <style>
-            .stApp { background: linear-gradient(180deg, #FEF3C7 0%, #FDE68A 100%); color: #1E293B; }
-            .stButton>button { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: white; border: none; border-radius: 12px; padding: 12px 24px; font-weight: bold; }
-            </style>
-            """, unsafe_allow_html=True
-        )
-    else:
-        st.markdown(
-            """
-            <style>
-            .stApp { background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%); color: #F8FAFC; }
-            .stButton>button { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color: white; border: none; border-radius: 12px; padding: 10px 20px; font-weight: bold; }
-            </style>
-            """, unsafe_allow_html=True
-        )
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #0F172A;
+        color: #F8FAFC;
+    }
+    .stButton>button {
+        background: linear-gradient(135deg, #6366F1 0%, #A855F7 100%);
+        color: white;
+        font-weight: bold;
+        border-radius: 12px;
+        border: none;
+        padding: 12px 24px;
+        box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.39);
+    }
+    .order-box {
+        background-color: #1E293B;
+        border-left: 6px solid #8B5CF6;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+    }
+    .badge {
+        background-color: #334155;
+        color: #38BDF8;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.85em;
+        font-weight: bold;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# ==================================================
-# 2. ระบบ Session State
-# ==================================================
-if 'phase' not in st.session_state:
-    st.session_state.phase = "SETUP"
-    st.session_state.players = []
-    st.session_state.roles = []
-    st.session_state.pins = {}          # เก็บ PIN แต่ละคน {player: pin}
-    st.session_state.status = []        # สถานะ มีชีวิต(True) / ตาย(False)
-    st.session_state.current_peek_idx = 0
-    st.session_state.card_revealed = False
+# --------------------------------------------------
+# 2. ฐานข้อมูลพอลิเมอร์ครบทุกหมวด ทุกเกรด และผู้ผลิต
+# --------------------------------------------------
+POLYMER_DATABASE = [
+    # --- หมวด 1: Biopolymers & Bio-composites ---
+    {
+        "category": "🌱 Biopolymers & Composites",
+        "material": "PLA (Polylactic Acid)",
+        "grade": "Ingeo™ Biopolymer 4032D (Film Grade)",
+        "producer": "NatureWorks LLC / GC International",
+        "desc": "ลูกค้าต้องการเป่าฟิล์มย่อยสลายได้สำหรับถุงใส่อาหาร ห้ามใช้อุณหภูมิสูงเกินไปเพราะเสี่ยง Thermal Degradation และ MFI เปลี่ยน!",
+        "target_temp": (180, 200),
+        "target_rpm": (40, 60),
+        "target_additive": (5, 10), # Plasticizer
+        "target_cooling": (6, 10)
+    },
+    {
+        "category": "🌱 Biopolymers & Composites",
+        "material": "PLA/PBAT/Biochar Composite",
+        "grade": "Custom Senior Research Grade (Bio-composite)",
+        "producer": "SUT Laboratory / In-house Compound",
+        "desc": "คอมพาวนด์ฟิล์มเกษตรผสมไบโอชา ห้ามใช้ Shear force สูงเกินไป เพราะไบโอชาจะแตกละเอียดส่งผลเสียต่อ Tensile Strength!",
+        "target_temp": (160, 180),
+        "target_rpm": (30, 50),
+        "target_additive": (10, 20),
+        "target_cooling": (8, 12)
+    },
     
-    # ข้อมูลการกระทำในคืนนั้นๆ
-    st.session_state.night_current_idx = 0
-    st.session_state.wolf_votes = {}    # {target: count}
-    st.session_state.seer_logs = {}     # {seer_name: result_text}
-    st.session_state.protected_player = None
-    st.session_state.witch_kill_target = None
-    st.session_state.witch_heal_used = False
-    st.session_state.witch_poison_used = False
-    st.session_state.witch_saved_tonight = False
-    st.session_state.winner = ""
+    # --- หมวด 2: Commodity Plastics ---
+    {
+        "category": "📦 Commodity Plastics",
+        "material": "HDPE (High-Density Polyethylene)",
+        "grade": "InnoPlus HD5000S (Injection Grade)",
+        "producer": "PTT Global Chemical (GC)",
+        "desc": "งานฉีดขึ้นรูปลังพลาสติกบรรจุสินค้า ต้องการ Flowability ดี แต่ห้ามเกิด Sink Mark (รอยบุ๋ม) จากการเย็นตัวไม่เท่ากัน!",
+        "target_temp": (210, 240),
+        "target_rpm": (70, 90),
+        "target_additive": (0, 5),
+        "target_cooling": (15, 25)
+    },
+    {
+        "category": "📦 Commodity Plastics",
+        "material": "PP (Polypropylene Random Copolymer)",
+        "grade": "SCG PP P700J (Injection Grade)",
+        "producer": "SCG Chemicals (SCGC)",
+        "desc": "กล่องบรรจุอาหารใสทนความร้อน ไมโครเวฟได้ ห้ามเกิด Warpage (ชิ้นงานบิดโก่ง) เด็ดขาด!",
+        "target_temp": (200, 230),
+        "target_rpm": (60, 80),
+        "target_additive": (2, 8),
+        "target_cooling": (10, 18)
+    },
 
-apply_theme(st.session_state.phase)
+    # --- หมวด 3: Engineering Plastics ---
+    {
+        "category": "⚙️ Engineering Plastics",
+        "material": "PA66 (Polyamide 66 / Nylon 66)",
+        "grade": "Ultramid® A3K (Unreinforced)",
+        "producer": "BASF",
+        "desc": "ฉีดเฟืองเกียร์พลาสติกในเครื่องจักรอุตสาหกรรม ต้องระวัง Hydrolysis Degradation ถ้าความชื้นสูง และห้ามใช้อุณหภูมิต่ำเกินไปจนพลาสติกไม่หลอม!",
+        "target_temp": (270, 295),
+        "target_rpm": (50, 75),
+        "target_additive": (1, 5),
+        "target_cooling": (12, 20)
+    },
+    {
+        "category": "⚙️ Engineering Plastics",
+        "material": "PC (Polycarbonate)",
+        "grade": "Makrolon® 2407 (Light Guide Grade)",
+        "producer": "Covestro",
+        "desc": "ฉีดเลนส์โคมไฟหน้ารถยนต์ โปร่งใสไร้รอยคราบ ห้ามเกิด Yellowing Index (ชิ้นงานเหลือง) จากการไหม้ในบาร์เรล!",
+        "target_temp": (280, 310),
+        "target_rpm": (40, 60),
+        "target_additive": (0, 3),
+        "target_cooling": (15, 25)
+    },
 
-# ==================================================
-# 1. SETUP (ตั้งชื่อ + เลือกบทบาท)
-# ==================================================
-if st.session_state.phase == "SETUP":
-    st.title("🐺 Ultimate Werewolf")
-    st.caption("✨ ระบบ PIN ล็อกอินทำภารกิจส่วนตัว เนียนที่สุด ไร้คนจับได้")
-    
-    st.subheader("📝 1. ตั้งชื่อผู้เล่น")
-    num_players = st.number_input("จำนวนผู้เล่นทั้งหมด (คน):", min_value=4, max_value=20, value=6)
-    
-    player_names = []
-    cols = st.columns(2)
-    for i in range(num_players):
-        col = cols[i % 2]
-        name = col.text_input(f"คนที่ {i+1}:", value=f"ผู้เล่น_{i+1}", key=f"p_{i}")
-        player_names.append(name.strip())
+    # --- หมวด 4: High-Performance / Specialty Plastics ---
+    {
+        "category": "🚀 High-Performance Plastics",
+        "material": "PEEK (Polyether Ether Ketone)",
+        "grade": "VICTREX™ PEEK 450G",
+        "producer": "Victrex plc",
+        "desc": "ชิ้นส่วนการแพทย์/การบินและอวกาศ ทนอุณหภูมิสูงและเคมีรุนแรง ต้องใช้อุณหภูมิหลอมสูงมาก ห้ามหล่อเย็นเร็วเกินไปจน Crystallinity ตก!",
+        "target_temp": (360, 390),
+        "target_rpm": (30, 50),
+        "target_additive": (0, 2),
+        "target_cooling": (25, 40)
+    }
+]
 
-    st.write("---")
-    st.subheader("🎭 2. เลือกบทบาทในเกม")
-    col1, col2 = st.columns(2)
-    with col1:
-        num_wolves = st.slider("🐺 หมาป่า (Werewolf):", 1, 4, 1 if num_players < 8 else 2)
-        has_seer = st.checkbox("🔮 หมอดู (Seer)", value=True)
-        has_guard = st.checkbox("🛡️ บอดี้การ์ด (Bodyguard)", value=True)
-    with col2:
-        has_witch = st.checkbox("🧙‍♀️ แม่มด (Witch)", value=True)
-        has_fool = st.checkbox("🤡 ตัวตลก (Fool)", value=num_players >= 7)
+# --------------------------------------------------
+# 3. ระบบจัดการสถานะเกม (Session State)
+# --------------------------------------------------
+if 'score' not in st.session_state:
+    st.session_state.score = 0
+if 'current_order' not in st.session_state:
+    st.session_state.current_order = random.choice(POLYMER_DATABASE)
 
-    special_count = num_wolves + sum([has_seer, has_guard, has_witch, has_fool])
-    villagers_count = num_players - special_count
+# --------------------------------------------------
+# 4. หน้าตา UI
+# --------------------------------------------------
+st.title("🔬 Extruder Overload: Polymer Master")
+st.caption("🤖 เกมจำลองกระบวนการแปรรูปพอลิเมอร์สมจริง แข่งกับ AI ลูกค้าสุดเฮี้ยบ")
 
-    if villagers_count < 0:
-        st.error(f"❌ บทบาทพิเศษเกินจำนวนผู้เล่น! (เลือกไว้ {special_count} บท)")
-    else:
-        st.info(f"📊 สรุป: หมาป่า {num_wolves} | บทพิเศษ {special_count - num_wolves} | ชาวบ้าน {villagers_count}")
+st.metric("🏆 คะแนนเกียรตินิยมวิศวกร", f"{st.session_state.score} EXP")
+
+order = st.session_state.current_order
+
+st.markdown(f"""
+<div class="order-box">
+    <span class="badge">{order['category']}</span>
+    <h3 style="margin-top:10px; color:#F43F5E;">{order['material']}</h3>
+    <p><b>เกรดพลาสติก:</b> <code style="color:#A855F7;">{order['grade']}</code></p>
+    <p><b>บริษัทผู้ผลิต:</b> 🏢 {order['producer']}</p>
+    <hr style="border-color:#334155;">
+    <p><b>ข้อกำหนดลูกค้า (Requirement):</b><br><i>"{order['desc']}"</i></p>
+</div>
+""", unsafe_allow_html=True)
+
+st.subheader("🎛️ ตั้งค่ากระบวนการแปรรูป (Processing Parameters)")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    temp = st.slider("🌡️ Barrel Temp (°C)", 140, 420, 200, step=5)
+    rpm = st.slider("🔄 Screw Speed (RPM)", 10, 120, 50, step=5)
+
+with col2:
+    additive = st.slider("🧪 Additive / Plasticizer (%)", 0, 30, 5, step=1)
+    cooling = st.slider("❄️ Cooling Time (s)", 2, 45, 10, step=1)
+
+st.write("---")
+
+if st.button("🚀 สั่งคอมพาวนด์และขึ้นรูป (Run Extrusion / Injection)"):
+    with st.spinner("⚙️ พอลิเมอร์กำลังเคลื่อนผ่าน Feed Zone -> Compression Zone -> Metering Zone..."):
+        time.sleep(1.8)
         
-        if st.button("🎲 เริ่มสุ่มบทบาท & ตั้งรหัส PIN"):
-            roles_pool = ['Werewolf'] * num_wolves
-            if has_seer: roles_pool.append('Seer')
-            if has_guard: roles_pool.append('Bodyguard')
-            if has_witch: roles_pool.append('Witch')
-            if has_fool: roles_pool.append('Fool')
-            roles_pool.extend(['Villager'] * villagers_count)
-
-            random.shuffle(roles_pool)
-
-            st.session_state.players = player_names
-            st.session_state.roles = roles_pool
-            st.session_state.status = [True] * num_players
-            st.session_state.current_peek_idx = 0
-            st.session_state.card_revealed = False
-            st.session_state.phase = "CHECK_ROLES"
-            st.rerun()
-
-# ==================================================
-# 2. CHECK ROLES & SET PIN (ดูบทบาท + ตั้ง PIN)
-# ==================================================
-elif st.session_state.phase == "CHECK_ROLES":
-    idx = st.session_state.current_peek_idx
-    current_player = st.session_state.players[idx]
-
-    st.title("🎴 ดูบทบาทลับ & ตั้งรหัส PIN")
-    st.subheader(f"📲 คิวของ: **{current_player}**")
-
-    if not st.session_state.card_revealed:
-        st.warning(f"👉 ส่ง iPad ให้ **{current_player}** แล้วกดปุ่มเพื่อเปิดการ์ด")
-        if st.button(f"👁️ เปิดดูบทบาทของ {current_player}"):
-            st.session_state.card_revealed = True
-            st.rerun()
-    else:
-        role = st.session_state.roles[idx]
-        st.markdown(f"""
-            <div class="role-card">
-                <h2>คุณได้บทบาท: {role}</h2>
-                <p>จำบทบาทนี้ไว้ให้ดี และอย่าให้เพื่อนข้างๆ เห็นหน้าจอ!</p>
-            </div>
-        """, unsafe_allow_html=True)
+        defects = []
+        deductions = 0
         
-        st.write("---")
-        st.subheader("🔑 ตั้งรหัส PIN ส่วนตัว 4 หลัก (ไว้ใช้เข้าทำภารกิจตอนกลางคืน)")
-        pin_input = st.text_input("กรอกรหัส PIN (ตัวเลข 4 หลัก):", type="password", max_chars=4, key=f"pin_set_{idx}")
+        # 1. เช็ก Barrel Temp
+        if temp < order['target_temp'][0]:
+            defects.append(f"🥶 Temp ต่ำกว่า Processing Window ({order['target_temp'][0]}°C): พอลิเมอร์ไม่หลอมสมบูรณ์ เกิด Unmelted Pellets อุดตัน Die!")
+            deductions += 30
+        elif temp > order['target_temp'][1]:
+            defects.append(f"🔥 Temp สูงเกินเกณฑ์ ({order['target_temp'][1]}°C): เกิด Thermal Degradation สายโซ่ขาด ชิ้นงานไหม้ดำและเกิดก๊าซพิษ!")
+            deductions += 35
 
-        if st.button("🔒 ยืนยันรหัส PIN & ส่งต่อ iPad"):
-            if len(pin_input) == 4 and pin_input.isdigit():
-                st.session_state.pins[current_player] = pin_input
-                st.session_state.card_revealed = False
-                
-                if st.session_state.current_peek_idx + 1 < len(st.session_state.players):
-                    st.session_state.current_peek_idx += 1
-                else:
-                    # ตั้ง PIN ครบทุกคนแล้ว -> เข้าสู่ช่วงกลางคืน
-                    st.session_state.phase = "START_NIGHT"
-                st.rerun()
-            else:
-                st.error("⚠️ กรุณากรอกรหัส PIN เป็นตัวเลข 4 หลักให้ถูกต้อง")
+        # 2. เช็ก Screw Speed (RPM)
+        if rpm > order['target_rpm'][1]:
+            defects.append("🌀 RPM สูงเกินไป: เกิด Shear Heating สะสมสูงเกินไป สายโซ่พอลิเมอร์ถูกตัดขาด (Shear Degradation) และเกิดฟองอากาศ")
+            deductions += 25
+        elif rpm < order['target_rpm'][0]:
+            defects.append("🐢 RPM ช้าเกินไป: Residence Time ในบาร์เรลนานเกินไป พลาสติกเสื่อมสภาพ และได้ Output ต่ำกว่าเป้าหมาย")
+            deductions += 15
 
-# ==================================================
-# 3. START NIGHT (เตรียมวนส่ง iPad ช่วงกลางคืน)
-# ==================================================
-elif st.session_state.phase == "START_NIGHT":
-    st.title("🌙 ราตรีคลี่คลุม... ได้เวลาทำภารกิจลับ")
-    st.info("ส่ง iPad วนให้เพื่อนทีละคนตามรายชื่อ เพื่อกรอก PIN เข้าไปทำภารกิจประจำคืน")
-    
-    st.session_state.night_current_idx = 0
-    st.session_state.wolf_votes = {}
-    st.session_state.seer_logs = {}
-    st.session_state.protected_player = None
-    st.session_state.witch_kill_target = None
-    st.session_state.witch_saved_tonight = False
-    
-    if st.button("🚀 เริ่มต้นส่ง iPad ทำภารกิจ"):
-        st.session_state.phase = "NIGHT_INPUT"
-        st.rerun()
+        # 3. เช็ก Additive
+        if additive > order['target_additive'][1]:
+            defects.append("💧 ใส่ Additive/Plasticizer มากเกินไป: เกิด Phase Separation (เยิ้มออกมาหน้าชิ้นงาน) และค่า Tensile Strength ตกอย่างรุนแรง")
+            deductions += 20
+        elif additive < order['target_additive'][0]:
+            defects.append("🧱 ใส่ Additive น้อยเกินไป: ชิ้นงานเปราะแตกง่าย ไม่ได้สมบัติทางกลตามสเปกของเกรดนี้")
+            deductions += 20
 
-# ==================================================
-# 4. NIGHT INPUT (กรอก PIN ทำภารกิจทีละคน)
-# ==================================================
-elif st.session_state.phase == "NIGHT_INPUT":
-    idx = st.session_state.night_current_idx
-    current_player = st.session_state.players[idx]
-    is_alive = st.session_state.status[idx]
+        # 4. เช็ก Cooling Time
+        if cooling < order['target_cooling'][0]:
+            defects.append("⏱️ Cooling Time น้อยเกินไป: ชิ้นงานยังไม่เซ็ตตัว เกิด Warpage (บิดโก่ง) หรือ Sink Mark (รอยบุ๋ม)")
+            deductions += 20
 
-    st.title("🌙 คืนอันเงียบสงบ")
-    st.subheader(f"📲 ยื่น iPad ให้: **{current_player}**")
-
-    if not is_alive:
-        st.error(f"💀 {current_player} เสียชีวิตแล้ว (ข้ามภารกิจ)")
-        if st.button("ส่งต่อให้คนถัดไป ➡️"):
-            if st.session_state.night_current_idx + 1 < len(st.session_state.players):
-                st.session_state.night_current_idx += 1
-            else:
-                st.session_state.phase = "DAY"
-            st.rerun()
-    else:
-        pin_attempt = st.text_input("🔑 กรอกรหัส PIN 4 หลักของคุณ:", type="password", max_chars=4, key=f"night_pin_{idx}")
-        
-        if st.button("🔓 ล็อกอินทำภารกิจ"):
-            if pin_attempt == st.session_state.pins[current_player]:
-                st.session_state.phase = "NIGHT_TASK"
-                st.rerun()
-            else:
-                st.error("❌ รหัส PIN ไม่ถูกต้อง!")
-
-# ==================================================
-# 5. NIGHT TASK (หน้าภารกิจลับตามบทบาท)
-# ==================================================
-elif st.session_state.phase == "NIGHT_TASK":
-    idx = st.session_state.night_current_idx
-    current_player = st.session_state.players[idx]
-    role = st.session_state.roles[idx]
-
-    st.title(f"🎭 ภารกิจลับของ: {current_player}")
-    st.caption(f"บทบาทของคุณคือ: **{role}**")
-    st.write("---")
-
-    alive_players = [st.session_state.players[i] for i in range(len(st.session_state.players)) if st.session_state.status[i]]
-
-    # --- ภารกิจหมาป่า ---
-    if role == 'Werewolf':
-        st.subheader("🐺 เลือกเหยื่อที่จะสังหารในคืนนี้:")
-        target = st.radio("เลือกเหยื่อ:", alive_players, key="wolf_target")
-        if st.button("✅ ยืนยันการฆ่า"):
-            st.session_state.wolf_votes[target] = st.session_state.wolf_votes.get(target, 0) + 1
-            st.success("บันทึกภารกิจเรียบร้อย!")
-            time.sleep(1)
-            # ถัดไป
-            if st.session_state.night_current_idx + 1 < len(st.session_state.players):
-                st.session_state.night_current_idx += 1
-                st.session_state.phase = "NIGHT_INPUT"
-            else:
-                st.session_state.phase = "DAY"
-            st.rerun()
-
-    # --- ภารกิจหมอดู ---
-    elif role == 'Seer':
-        st.subheader("🔮 เลือกคนที่ต้องการส่องดูบทบาท (1 คน):")
-        seer_target = st.selectbox("เลือกผู้เล่น:", [p for p in st.session_state.players if p != current_player])
-        
-        if st.button("🔍 ตรวจสอบ"):
-            t_idx = st.session_state.players.index(seer_target)
-            is_wolf = (st.session_state.roles[t_idx] == 'Werewolf')
-            res = "🐺 เป็นหมาป่า!" if is_wolf else "🧑 เป็นคนธรรมดา"
-            st.info(f"ผลการส่อง: **{seer_target}** -> {res}")
+        # แสดงผลลัพธ์
+        if len(defects) == 0:
+            st.balloons()
+            st.success("🎉 PERFECT! ขึ้นรูปชิ้นงานได้ตรงตามสเปก โครงสร้างผลึก (Crystallinity) และสมบัติทางกลสมบูรณ์แบบ!")
+            st.session_state.score += 150
+            st.info("🤖 **AI QC Inspector:** 'ผ่าน QC 100%! เกรดนี้แปรรูปยากมาก แต่คุณทำได้เนียนจริงๆ เอางานถัดไปไปทำต่อเลย!'")
+        else:
+            st.error("💥 QC Reject! ชิ้นงานเสียสภาพ พบข้อผิดพลาดทางเทคนิคดังนี้:")
+            for d in defects:
+                st.write(f"- {d}")
             
-            if st.button("✅ รับทราบ & ปิดหน้าจอ"):
-                if st.session_state.night_current_idx + 1 < len(st.session_state.players):
-                    st.session_state.night_current_idx += 1
-                    st.session_state.phase = "NIGHT_INPUT"
-                else:
-                    st.session_state.phase = "DAY"
-                st.rerun()
+            gained_score = max(0, 100 - deductions)
+            st.session_state.score += gained_score
+            st.warning(f"📉 ได้รับคะแนนรอบนี้: {gained_score} / 100 คะแนน")
+            st.info("🤖 **AI QC Inspector:** 'ชิ้นงานเกรดนี้ราคาแพงมากนะ! ปรับค่า Parameter ใหม่ แล้วลองดูอีกที!'")
 
-    # --- ภารกิจบอดี้การ์ด ---
-    elif role == 'Bodyguard':
-        st.subheader("🛡️ เลือกคนที่ต้องการปกป้องคืนนี้:")
-        guard_target = st.selectbox("เลือกผู้เล่น:", alive_players)
-        if st.button("✅ ยืนยันการปกป้อง"):
-            st.session_state.protected_player = guard_target
-            st.success("บันทึกการปกป้องเรียบร้อย!")
-            time.sleep(1)
-            if st.session_state.night_current_idx + 1 < len(st.session_state.players):
-                st.session_state.night_current_idx += 1
-                st.session_state.phase = "NIGHT_INPUT"
-            else:
-                st.session_state.phase = "DAY"
+        st.write("---")
+        if st.button("🔄 รับออเดอร์พอลิเมอร์เกรดถัดไป"):
+            st.session_state.current_order = random.choice(POLYMER_DATABASE)
             st.rerun()
-
-    # --- ภารกิจแม่มด ---
-    elif role == 'Witch':
-        st.subheader("🧙‍♀️ แม่มดใช้เวทมนตร์:")
-        
-        # คำนวณเหยื่อหมาป่าคร่าวๆ ให้แม่มดเห็น
-        top_wolf_target = max(st.session_state.wolf_votes, key=st.session_state.wolf_votes.get) if st.session_state.wolf_votes else None
-        if top_wolf_target:
-            st.warning(f"💡 คืนนี้หมาป่าเล็งสังหาร: **{top_wolf_target}**")
-        else:
-            st.info("💡 คืนนี้ยังไม่มีเหยื่อหมาป่าชัดเจน")
-
-        use_heal = False
-        if not st.session_state.witch_heal_used and top_wolf_target:
-            use_heal = st.checkbox(f"🧪 ใช้ยาชุบชีวิตช่วย {top_wolf_target}")
-
-        use_poison = False
-        poison_target = None
-        if not st.session_state.witch_poison_used:
-            use_poison = st.checkbox("☠️ ใช้ยาพิษสังหารผู้เล่น")
-            if use_poison:
-                poison_target = st.selectbox("เลือกคนที่ต้องการวางยาพิษ:", alive_players)
-
-        if st.button("✅ ยืนยันการใช้ยา"):
-            if use_heal:
-                st.session_state.witch_saved_tonight = True
-                st.session_state.witch_heal_used = True
-            if use_poison and poison_target:
-                st.session_state.witch_kill_target = poison_target
-                st.session_state.witch_poison_used = True
-
-            st.success("บันทึกภารกิจแม่มดเรียบร้อย!")
-            time.sleep(1)
-            if st.session_state.night_current_idx + 1 < len(st.session_state.players):
-                st.session_state.night_current_idx += 1
-                st.session_state.phase = "NIGHT_INPUT"
-            else:
-                st.session_state.phase = "DAY"
-            st.rerun()
-
-    # --- ภารกิจชาวบ้าน / ตัวตลก / บทอื่นๆ (ปุ่มหลอกเนียนๆ) ---
-    else:
-        st.subheader("🧑 ชาวบ้านธรรมดา / บทบาททั่วไป")
-        st.info("คุณไม่มีพลังพิเศษในตอนกลางคืน กดปุ่มด้านล่างเพื่อยืนยันการทำภารกิจเนียนๆ")
-        if st.button("✅ ยืนยันการทำภารกิจเรียบร้อย"):
-            st.success("บันทึกข้อมูลเรียบร้อย!")
-            time.sleep(1)
-            if st.session_state.night_current_idx + 1 < len(st.session_state.players):
-                st.session_state.night_current_idx += 1
-                st.session_state.phase = "NIGHT_INPUT"
-            else:
-                st.session_state.phase = "DAY"
-            st.rerun()
-
-# ==================================================
-# 6. DAY PHASE (ประมวลผลตอนเช้า)
-# ==================================================
-elif st.session_state.phase == "DAY":
-    st.title("☀️ เช้าวันใหม่ - สรุปผลคืนที่ผ่านมา")
-    
-    # คำนวณคนตายจากหมาป่า
-    dead_tonight = []
-    final_wolf_target = max(st.session_state.wolf_votes, key=st.session_state.wolf_votes.get) if st.session_state.wolf_votes else None
-
-    if final_wolf_target:
-        # เช็คว่าโดนการ์ดปกป้อง หรือแม่มดช่วยไหม
-        if final_wolf_target != st.session_state.protected_player and not st.session_state.witch_saved_tonight:
-            w_idx = st.session_state.players.index(final_wolf_target)
-            if st.session_state.status[w_idx]:
-                st.session_state.status[w_idx] = False
-                dead_tonight.append(final_wolf_target)
-
-    # คำนวณคนตายจากยาพิษแม่มด
-    if st.session_state.witch_kill_target:
-        p_idx = st.session_state.players.index(st.session_state.witch_kill_target)
-        if st.session_state.status[p_idx]:
-            st.session_state.status[p_idx] = False
-            dead_tonight.append(st.session_state.witch_kill_target)
-
-    if len(dead_tonight) == 0:
-        st.success("🎉 เป็นข่าวดี! เมื่อคืนไม่มีใครเสียชีวิตเลย")
-    else:
-        st.error(f"💀 ผู้เสียชีวิตในคืนนี้ได้แก่: {', '.join(dead_tonight)}")
-
-    # ตรวจสอบเงื่อนไขชนะ
-    wolves = sum(1 for i in range(len(st.session_state.players)) if st.session_state.status[i] and st.session_state.roles[i] == 'Werewolf')
-    villagers = sum(1 for i in range(len(st.session_state.players)) if st.session_state.status[i] and st.session_state.roles[i] != 'Werewolf')
-
-    if wolves == 0:
-        st.session_state.winner = "🎉 ฝ่ายชาวบ้านชนะ! (Villagers Win)"
-        st.session_state.phase = "GAMEOVER"
-        st.rerun()
-    elif wolves >= villagers:
-        st.session_state.winner = "🐺 ฝ่ายหมาป่าชนะ! (Werewolves Win)"
-        st.session_state.phase = "GAMEOVER"
-        st.rerun()
-
-    if st.button("🗳️ พูดคุยเสร็จแล้ว -> ไปช่วงโหวตประหาร"):
-        st.session_state.phase = "VOTING"
-        st.rerun()
-
-# ==================================================
-# 7. VOTING (โหวตประหาร)
-# ==================================================
-elif st.session_state.phase == "VOTING":
-    st.title("🗳️ ช่วงโหวตประหารชีวิต")
-    alive_players = [st.session_state.players[i] for i in range(len(st.session_state.players)) if st.session_state.status[i]]
-    
-    vote_target = st.selectbox("เลือกคนถูกโหวตประหาร:", alive_players)
-    
-    if st.button("⚖️ ยืนยันผลประหารชีวิต"):
-        v_idx = st.session_state.players.index(vote_target)
-        st.session_state.status[v_idx] = False
-        role_voted = st.session_state.roles[v_idx]
-        
-        st.warning(f"⚖️ **{vote_target}** ถูกประหารชีวิต! (บทบาทจริงคือ: {role_voted})")
-        
-        if role_voted == 'Fool':
-            st.session_state.winner = f"🤡 **{vote_target} (ตัวตลก)** ชนะเกม! เพราะปั่นจนโดนโหวตออกสำเร็จ!"
-            st.session_state.phase = "GAMEOVER"
-            st.rerun()
-
-        wolves = sum(1 for i in range(len(st.session_state.players)) if st.session_state.status[i] and st.session_state.roles[i] == 'Werewolf')
-        villagers = sum(1 for i in range(len(st.session_state.players)) if st.session_state.status[i] and st.session_state.roles[i] != 'Werewolf')
-
-        if wolves == 0:
-            st.session_state.winner = "🎉 ฝ่ายชาวบ้านชนะ!"
-            st.session_state.phase = "GAMEOVER"
-        elif wolves >= villagers:
-            st.session_state.winner = "🐺 ฝ่ายหมาป่าชนะ!"
-            st.session_state.phase = "GAMEOVER"
-        else:
-            st.session_state.phase = "START_NIGHT"
-        
-        time.sleep(3)
-        st.rerun()
-
-# ==================================================
-# 8. GAME OVER
-# ==================================================
-elif st.session_state.phase == "GAMEOVER":
-    st.balloons()
-    st.title("🏆 GAME OVER")
-    st.header(st.session_state.winner)
-    
-    st.write("---")
-    st.subheader("📜 เฉลยบทบาททุกคน:")
-    for i in range(len(st.session_state.players)):
-        st_text = "🟢 รอดชีวิต" if st.session_state.status[i] else "💀 เสียชีวิต"
-        st.write(f"- **{st.session_state.players[i]}**: {st.session_state.roles[i]} ({st_text})")
-
-    if st.button("🔄 เล่นใหม่อีกรอบ"):
-        st.session_state.phase = "SETUP"
-        st.rerun()
